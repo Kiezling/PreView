@@ -7,36 +7,10 @@ import { useAuth } from '../components/AuthContext';
 import { generateTargetId, getDeviceType } from '../lib/utils';
 
 const ATTRIBUTES = {
-  modality: ['Cardinal', 'Fixed', 'Mutable'],
-  element: ['Fire', 'Earth', 'Air', 'Water'],
-  zodiacSign: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'],
-  arcana: ['Major', 'Minor'],
+  valence: ['Positive', 'Negative'],
+  element: ['Hot', 'Cold', 'Heavy', 'Sharp'],
+  archetype: ['Major', 'Minor'],
 };
-
-const TAROT_CARDS = [
-  { name: "The Fool", url: "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg" },
-  { name: "The Magician", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg" },
-  { name: "The High Priestess", url: "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg" },
-  { name: "The Empress", url: "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg" },
-  { name: "The Emperor", url: "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg" },
-  { name: "The Hierophant", url: "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg" },
-  { name: "The Lovers", url: "https://upload.wikimedia.org/wikipedia/commons/3/3a/TheLovers.jpg" },
-  { name: "The Chariot", url: "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg" },
-  { name: "Strength", url: "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg" },
-  { name: "The Hermit", url: "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg" },
-  { name: "Wheel of Fortune", url: "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg" },
-  { name: "Justice", url: "https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg" },
-  { name: "The Hanged Man", url: "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg" },
-  { name: "Death", url: "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg" },
-  { name: "Temperance", url: "https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg" },
-  { name: "The Devil", url: "https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg" },
-  { name: "The Tower", url: "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg" },
-  { name: "The Star", url: "https://upload.wikimedia.org/wikipedia/commons/c/cd/RWS_Tarot_17_Star.jpg" },
-  { name: "The Moon", url: "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg" },
-  { name: "The Sun", url: "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg" },
-  { name: "Judgement", url: "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgment.jpg" },
-  { name: "The World", url: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg" }
-];
 
 export const AstroTarot: React.FC = () => {
   const { user } = useAuth();
@@ -202,12 +176,24 @@ export const AstroTarot: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 mb-10 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
-                {Object.entries(selectedAttributes).some(([k, v]) => v && actualAttributes[k] === v) ? (
-                  <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
-                ) : (
-                  <span className="text-3xl font-bold text-white tracking-widest uppercase">Miss</span>
-                )}
+              <div className="flex flex-col gap-3 mb-10 w-full max-w-md">
+                {Object.entries(selectedAttributes).map(([key, value]) => {
+                  if (!value) return null;
+                  const isHit = actualAttributes[key] === value;
+                  return (
+                    <div key={key} className={`flex items-center justify-between px-6 py-4 rounded-xl border ${isHit ? 'bg-white/10 border-white/30' : 'bg-neutral-900/80 border-neutral-800'}`}>
+                      <span className="text-neutral-400 capitalize">{key}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-white font-medium">{value}</span>
+                        {isHit ? (
+                          <span className="text-green-400 font-bold tracking-widest uppercase text-sm">Hit</span>
+                        ) : (
+                          <span className="text-neutral-500 font-bold tracking-widest uppercase text-sm">Miss</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
               <button
                 onClick={reset}
