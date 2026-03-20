@@ -205,37 +205,36 @@ service cloud.firestore {
     match /zenerAttempts/{attemptId} {
       // Users can read all attempts for global stats
       allow read: if isAuthenticated();
-      // Users can create attempts for themselves.
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidZenerAttempt(request.resource.data);
       // Attempts are immutable once created.
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /colorAttempts/{attemptId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidColorAttempt(request.resource.data);
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /standardDeckAttempts/{attemptId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidStandardDeckAttempt(request.resource.data);
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /astroTarotAttempts/{attemptId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidAstroTarotAttempt(request.resource.data);
+      allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /stockAttempts/{attemptId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidStockAttempt(request.resource.data);
+      allow create: if false;
       // Stock attempts might need to be updated with the actual direction later, but for now, let's say they are immutable by the user.
       // A backend process would update them, or the user can update them if they are the owner and only changing actualDirection/isSuccess.
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidStockAttempt(request.resource.data) &&

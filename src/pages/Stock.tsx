@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { TrendingUp, RefreshCw, CheckCircle2, XCircle, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
 import { collection, addDoc, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
 import { format, addDays, isWeekend } from 'date-fns';
+import { getDeviceType } from '../lib/utils';
 
 export const Stock: React.FC = () => {
   const { user } = useAuth();
@@ -15,6 +17,13 @@ export const Stock: React.FC = () => {
   const [images, setImages] = useState({ higher: '', lower: '', prior: '' });
   const [priorClose, setPriorClose] = useState<number | null>(null);
   const [isLoadingClose, setIsLoadingClose] = useState(true);
+
+  const startTimeRef = useRef<number>(Date.now());
+  const sequenceIndexRef = useRef<number>(0);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+  }, [targetDate]);
 
   useEffect(() => {
     // Calculate next trading day
@@ -73,19 +82,28 @@ export const Stock: React.FC = () => {
   const handleSelect = async (direction: 'Higher' | 'Lower') => {
     if (selectedDirection || isSubmitting || !user) return;
     
+    const timeToDecisionMs = Date.now() - startTimeRef.current;
+    sequenceIndexRef.current += 1;
+
     setIsSubmitting(true);
     
     try {
-      await addDoc(collection(db, 'stockAttempts'), {
-        userId: user.uid,
+      const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
+      const result = await generateAndGrade({
+        testType: 'Stock',
+        guess: direction,
         targetDate: format(targetDate, 'yyyy-MM-dd'),
-        selectedDirection: direction,
-        actualDirection: 'Pending',
-        isSuccess: false,
-        timestamp: new Date().toISOString(),
+        telemetry: {
+          timeToDecisionMs,
+          sessionSequenceIndex: sequenceIndexRef.current,
+          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          deviceType: getDeviceType()
+        }
       });
+      
+      const { actualTarget } = result.data as any;
       setSelectedDirection(direction);
-      setActualDirection('Pending');
+      setActualDirection(actualTarget);
     } catch (error) {
       console.error("Error saving attempt:", error);
     } finally {

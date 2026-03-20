@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Layers, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId } from '../lib/utils';
+import { generateTargetId, cryptoRandom, getDeviceType } from '../lib/utils';
 
 const ATTRIBUTES = {
   modality: ['Cardinal', 'Fixed', 'Mutable'],
@@ -46,6 +47,13 @@ export const AstroTarot: React.FC = () => {
   const [actualCard, setActualCard] = useState<{name: string, url: string} | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const startTimeRef = useRef<number>(Date.now());
+  const sequenceIndexRef = useRef<number>(0);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+  }, [targetId]);
+
   const handleSelect = (category: string, value: string) => {
     if (actualAttributes || isSubmitting) return;
     setSelectedAttributes(prev => ({
@@ -57,36 +65,28 @@ export const AstroTarot: React.FC = () => {
   const handleSubmit = async () => {
     if (Object.keys(selectedAttributes).length === 0 || isSubmitting || !user) return;
     
+    const timeToDecisionMs = Date.now() - startTimeRef.current;
+    sequenceIndexRef.current += 1;
+
     setIsSubmitting(true);
     
-    // Generate actual attributes
-    const generated: Record<string, string> = {};
-    Object.entries(ATTRIBUTES).forEach(([key, values]) => {
-      generated[key] = values[Math.floor(Math.random() * values.length)];
-    });
-    
-    const randomCard = TAROT_CARDS[Math.floor(Math.random() * TAROT_CARDS.length)];
-    
-    setActualAttributes(generated);
-    setActualCard(randomCard);
-    
-    // Calculate success (if they guessed at least one correctly, or fully? Let's say partial success if any match)
-    let isSuccess = false;
-    Object.entries(selectedAttributes).forEach(([key, value]) => {
-      if (value && generated[key] === value) {
-        isSuccess = true;
-      }
-    });
-
     try {
-      await addDoc(collection(db, 'astroTarotAttempts'), {
-        userId: user.uid,
+      const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
+      const result = await generateAndGrade({
+        testType: 'AstroTarot',
+        guess: selectedAttributes,
         targetId,
-        selectedAttributes,
-        actualAttributes: generated,
-        isSuccess,
-        timestamp: new Date().toISOString(),
+        telemetry: {
+          timeToDecisionMs,
+          sessionSequenceIndex: sequenceIndexRef.current,
+          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          deviceType: getDeviceType()
+        }
       });
+      
+      const { actualTarget } = result.data as any;
+      setActualAttributes(actualTarget.attributes);
+      setActualCard(actualTarget.card);
     } catch (error) {
       console.error("Error saving attempt:", error);
     } finally {

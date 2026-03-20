@@ -286,7 +286,7 @@ export const Home: React.FC = () => {
                     
                     {card.stats.subStats && (
                       <div className="mt-4 pt-4 border-t border-neutral-800 grid grid-cols-3 gap-2">
-                        {Object.entries(card.stats.subStats).map(([key, subStat]) => (
+                        {Object.entries(card.stats.subStats).map(([key, subStat]: [string, any]) => (
                           <div key={key} className="text-center">
                             <p className="text-[9px] text-neutral-500 uppercase">{key}</p>
                             <p className="text-xs font-mono text-white mt-1">
@@ -315,7 +315,7 @@ export const Home: React.FC = () => {
                     
                     {card.stats.subStats && (
                       <div className="mt-4 pt-4 border-t border-neutral-800 grid grid-cols-3 gap-2">
-                        {Object.entries(card.stats.subStats).map(([key, subStat]) => (
+                        {Object.entries(card.stats.subStats).map(([key, subStat]: [string, any]) => (
                           <div key={key} className="text-center">
                             <p className="text-[9px] text-neutral-500 uppercase">{key}</p>
                             <p className="text-xs font-mono text-neutral-400 mt-1">

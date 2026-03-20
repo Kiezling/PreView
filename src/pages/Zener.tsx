@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Star, RefreshCw, CheckCircle2, XCircle, Circle, Plus, Waves, Square, Star as StarIcon } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId } from '../lib/utils';
+import { generateTargetId, cryptoRandom, getDeviceType } from '../lib/utils';
 
 const CARDS = ['Circle', 'Cross', 'Waves', 'Square', 'Star'];
 
@@ -39,27 +40,38 @@ export const Zener: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isColored, setIsColored] = useState(false);
 
+  const startTimeRef = useRef<number>(Date.now());
+  const sequenceIndexRef = useRef<number>(0);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+  }, [targetId]);
+
   const handleSelect = async (card: string) => {
     if (selectedCard || isSubmitting || !user) return;
+    
+    const timeToDecisionMs = Date.now() - startTimeRef.current;
+    sequenceIndexRef.current += 1;
     
     setIsSubmitting(true);
     setSelectedCard(card);
     
-    // Generate actual card
-    const randomCard = CARDS[Math.floor(Math.random() * CARDS.length)];
-    setActualCard(randomCard);
-    
-    const isSuccess = card === randomCard;
-
     try {
-      await addDoc(collection(db, 'zenerAttempts'), {
-        userId: user.uid,
+      const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
+      const result = await generateAndGrade({
+        testType: 'Zener',
+        guess: card,
         targetId,
-        selectedCard: card,
-        actualCard: randomCard,
-        isSuccess,
-        timestamp: new Date().toISOString(),
+        telemetry: {
+          timeToDecisionMs,
+          sessionSequenceIndex: sequenceIndexRef.current,
+          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          deviceType: getDeviceType()
+        }
       });
+      
+      const { actualTarget } = result.data as any;
+      setActualCard(actualTarget);
     } catch (error) {
       console.error("Error saving attempt:", error);
     } finally {

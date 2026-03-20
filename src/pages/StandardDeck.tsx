@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Spade, RefreshCw, ArrowLeft } from 'lucide-react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId } from '../lib/utils';
+import { generateTargetId, cryptoRandom, getDeviceType } from '../lib/utils';
 
 const SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -26,6 +27,13 @@ export const StandardDeck: React.FC = () => {
   const [actualCard, setActualCard] = useState<Card | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const startTimeRef = useRef<number>(Date.now());
+  const sequenceIndexRef = useRef<number>(0);
+
+  useEffect(() => {
+    startTimeRef.current = Date.now();
+  }, [targetId]);
+
   const handleStart = (type: GuessType) => {
     setGuessType(type);
     setTargetId(generateTargetId());
@@ -36,32 +44,29 @@ export const StandardDeck: React.FC = () => {
   const handleSelect = async (option: string) => {
     if (selectedOption || isSubmitting || !user || !guessType) return;
     
+    const timeToDecisionMs = Date.now() - startTimeRef.current;
+    sequenceIndexRef.current += 1;
+
     setIsSubmitting(true);
     setSelectedOption(option);
     
-    // Generate random card
-    const randomSuit = SUITS[Math.floor(Math.random() * SUITS.length)];
-    const randomValue = VALUES[Math.floor(Math.random() * VALUES.length)];
-    const randomColor = ['Hearts', 'Diamonds'].includes(randomSuit) ? 'Red' : 'Black';
-    
-    const generatedCard = { suit: randomSuit, value: randomValue, color: randomColor };
-    setActualCard(generatedCard);
-    
-    let isSuccess = false;
-    if (guessType === 'color') isSuccess = option === randomColor;
-    if (guessType === 'suit') isSuccess = option === randomSuit;
-    if (guessType === 'value') isSuccess = option === randomValue;
-
     try {
-      await addDoc(collection(db, 'standardDeckAttempts'), {
-        userId: user.uid,
-        targetId,
+      const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
+      const result = await generateAndGrade({
+        testType: 'StandardDeck',
+        guess: option,
         guessType,
-        selectedOption: option,
-        actualCard: generatedCard,
-        isSuccess,
-        timestamp: new Date().toISOString(),
+        targetId,
+        telemetry: {
+          timeToDecisionMs,
+          sessionSequenceIndex: sequenceIndexRef.current,
+          localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          deviceType: getDeviceType()
+        }
       });
+      
+      const { actualTarget } = result.data as any;
+      setActualCard(actualTarget);
     } catch (error) {
       console.error("Error saving attempt:", error);
     } finally {
