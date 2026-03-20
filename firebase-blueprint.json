@@ -1,0 +1,155 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the PreView app.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "The user's unique ID."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "The user's email address."
+        },
+        "displayName": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "The user's profile picture URL."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the user account was created."
+        }
+      },
+      "required": ["uid", "createdAt"]
+    },
+    "ZenerAttempt": {
+      "title": "Zener Attempt",
+      "description": "A user's attempt at guessing a Zener card.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who made the attempt."
+        },
+        "targetId": {
+          "type": "string",
+          "description": "The target identifier for the attempt."
+        },
+        "selectedCard": {
+          "type": "string",
+          "enum": ["Circle", "Cross", "Waves", "Square", "Star"],
+          "description": "The card the user selected."
+        },
+        "actualCard": {
+          "type": "string",
+          "enum": ["Circle", "Cross", "Waves", "Square", "Star"],
+          "description": "The actual randomly generated card."
+        },
+        "isSuccess": {
+          "type": "boolean",
+          "description": "Whether the user guessed correctly."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the attempt was made."
+        }
+      },
+      "required": ["userId", "targetId", "selectedCard", "actualCard", "isSuccess", "timestamp"]
+    },
+    "AstroTarotAttempt": {
+      "title": "Astro-Tarot Attempt",
+      "description": "A user's attempt at guessing Astro-Tarot attributes.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who made the attempt."
+        },
+        "targetId": {
+          "type": "string",
+          "description": "The target identifier for the attempt."
+        },
+        "selectedAttributes": {
+          "type": "object",
+          "description": "The attributes the user selected."
+        },
+        "actualAttributes": {
+          "type": "object",
+          "description": "The actual randomly generated attributes."
+        },
+        "isSuccess": {
+          "type": "boolean",
+          "description": "Whether the user guessed correctly (at least partially, or fully depending on logic)."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the attempt was made."
+        }
+      },
+      "required": ["userId", "targetId", "selectedAttributes", "actualAttributes", "isSuccess", "timestamp"]
+    },
+    "StockAttempt": {
+      "title": "Stock Attempt",
+      "description": "A user's attempt at guessing the stock market direction.",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "The ID of the user who made the attempt."
+        },
+        "targetDate": {
+          "type": "string",
+          "description": "The date being predicted."
+        },
+        "selectedDirection": {
+          "type": "string",
+          "enum": ["Higher", "Lower"],
+          "description": "The direction the user selected."
+        },
+        "actualDirection": {
+          "type": "string",
+          "enum": ["Higher", "Lower", "Pending"],
+          "description": "The actual direction of the market."
+        },
+        "isSuccess": {
+          "type": "boolean",
+          "description": "Whether the user guessed correctly."
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "When the attempt was made."
+        }
+      },
+      "required": ["userId", "targetDate", "selectedDirection", "actualDirection", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Stores user profiles."
+    },
+    "/zenerAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/ZenerAttempt" },
+      "description": "Stores Zener card attempts."
+    },
+    "/astroTarotAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/AstroTarotAttempt" },
+      "description": "Stores Astro-Tarot attempts."
+    },
+    "/stockAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/StockAttempt" },
+      "description": "Stores stock market attempts."
+    }
+  }
+}

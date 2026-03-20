@@ -1,0 +1,249 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required) - The user's unique ID.
+    //   - email: string (optional) - The user's email address.
+    //   - displayName: string (optional) - The user's display name.
+    //   - photoURL: string (optional) - The user's profile picture URL.
+    //   - createdAt: string (required) - When the user account was created.
+    //
+    // Collection: zenerAttempts
+    // Document ID: {attemptId}
+    // Fields:
+    //   - userId: string (required) - The ID of the user who made the attempt.
+    //   - targetId: string (required) - The target identifier for the attempt.
+    //   - selectedCard: string (required) - The card the user selected.
+    //   - actualCard: string (required) - The actual randomly generated card.
+    //   - isSuccess: boolean (required) - Whether the user guessed correctly.
+    //   - timestamp: string (required) - When the attempt was made.
+    //
+    // Collection: colorAttempts
+    // Document ID: {attemptId}
+    // Fields:
+    //   - userId: string (required) - The ID of the user who made the attempt.
+    //   - targetId: string (required) - The target identifier for the attempt.
+    //   - selectedColor: string (required) - The color the user selected.
+    //   - actualColor: string (required) - The actual randomly generated color.
+    //   - isSuccess: boolean (required) - Whether the user guessed correctly.
+    //   - timestamp: string (required) - When the attempt was made.
+    //
+    // Collection: standardDeckAttempts
+    // Document ID: {attemptId}
+    // Fields:
+    //   - userId: string (required) - The ID of the user who made the attempt.
+    //   - targetId: string (required) - The target identifier for the attempt.
+    //   - guessType: string (required) - The type of guess (color, suit, value).
+    //   - selectedOption: string (required) - The option the user selected.
+    //   - actualCard: map (required) - The actual randomly generated card.
+    //   - isSuccess: boolean (required) - Whether the user guessed correctly.
+    //   - timestamp: string (required) - When the attempt was made.
+    //
+    // Collection: astroTarotAttempts
+    // Document ID: {attemptId}
+    // Fields:
+    //   - userId: string (required) - The ID of the user who made the attempt.
+    //   - targetId: string (required) - The target identifier for the attempt.
+    //   - selectedAttributes: map (required) - The attributes the user selected.
+    //   - actualAttributes: map (required) - The actual randomly generated attributes.
+    //   - isSuccess: boolean (required) - Whether the user guessed correctly.
+    //   - timestamp: string (required) - When the attempt was made.
+    //
+    // Collection: stockAttempts
+    // Document ID: {attemptId}
+    // Fields:
+    //   - userId: string (required) - The ID of the user who made the attempt.
+    //   - targetDate: string (required) - The date being predicted.
+    //   - selectedDirection: string (required) - The direction the user selected.
+    //   - actualDirection: string (required) - The actual direction of the market.
+    //   - isSuccess: boolean (optional) - Whether the user guessed correctly.
+    //   - timestamp: string (required) - When the attempt was made.
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.userId;
+    }
+
+    function uidUnchanged() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid;
+    }
+
+    function uidNotModified() {
+      return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function validStringLength(field, minLen, maxLen) {
+      return request.resource.data[field] is string &&
+        request.resource.data[field].size() >= minLen &&
+        request.resource.data[field].size() <= maxLen;
+    }
+
+    function isValidOptionalString(field, minLen, maxLen) {
+      return !(field in request.resource.data) ||
+             (request.resource.data[field] is string &&
+              request.resource.data[field].size() >= minLen &&
+              request.resource.data[field].size() <= maxLen);
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string &&
+        dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'displayName', 'photoURL', 'createdAt']) &&
+             data.uid is string && data.uid.size() > 0 && data.uid.size() < 128 &&
+             isValidOptionalString('email', 0, 256) &&
+             isValidOptionalString('displayName', 0, 100) &&
+             isValidOptionalString('photoURL', 0, 1024) &&
+             isValidDateString(data.createdAt);
+    }
+
+    function isValidZenerAttempt(data) {
+      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedCard', 'actualCard', 'isSuccess', 'timestamp']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
+             data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
+             data.selectedCard in ['Circle', 'Cross', 'Waves', 'Square', 'Star'] &&
+             data.actualCard in ['Circle', 'Cross', 'Waves', 'Square', 'Star'] &&
+             data.isSuccess is bool &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidColorAttempt(data) {
+      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedColor', 'actualColor', 'isSuccess', 'timestamp']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
+             data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
+             data.selectedColor in ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Violet'] &&
+             data.actualColor in ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Violet'] &&
+             data.isSuccess is bool &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidStandardDeckAttempt(data) {
+      return hasOnlyAllowedFields(['userId', 'targetId', 'guessType', 'selectedOption', 'actualCard', 'isSuccess', 'timestamp']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
+             data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
+             data.guessType in ['color', 'suit', 'value'] &&
+             data.selectedOption is string && data.selectedOption.size() > 0 && data.selectedOption.size() < 20 &&
+             data.actualCard is map &&
+             data.actualCard.keys().hasOnly(['suit', 'value', 'color']) &&
+             data.actualCard.suit in ['Hearts', 'Diamonds', 'Clubs', 'Spades'] &&
+             data.actualCard.value in ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'] &&
+             data.actualCard.color in ['Red', 'Black'] &&
+             data.isSuccess is bool &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidAstroTarotAttempt(data) {
+      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedAttributes', 'actualAttributes', 'isSuccess', 'timestamp']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
+             data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
+             data.selectedAttributes is map &&
+             data.actualAttributes is map &&
+             data.isSuccess is bool &&
+             isValidDateString(data.timestamp);
+    }
+
+    function isValidStockAttempt(data) {
+      return hasOnlyAllowedFields(['userId', 'targetDate', 'selectedDirection', 'actualDirection', 'isSuccess', 'timestamp']) &&
+             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
+             data.targetDate is string && data.targetDate.size() > 0 && data.targetDate.size() < 64 &&
+             data.selectedDirection in ['Higher', 'Lower'] &&
+             data.actualDirection in ['Higher', 'Lower', 'Pending'] &&
+             (!( 'isSuccess' in data ) || data.isSuccess is bool) &&
+             isValidDateString(data.timestamp);
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      // Users can only read their own profile.
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) && uidUnchanged();
+      allow update: if isOwner(userId) && isValidUser(request.resource.data) && uidNotModified() && request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    match /users_public/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) && hasOnlyAllowedFields(['uid', 'displayName', 'photoURL']) && uidUnchanged();
+      allow update: if isOwner(userId) && hasOnlyAllowedFields(['uid', 'displayName', 'photoURL']) && uidNotModified();
+    }
+
+    match /zenerAttempts/{attemptId} {
+      // Users can read all attempts for global stats
+      allow read: if isAuthenticated();
+      // Users can create attempts for themselves.
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidZenerAttempt(request.resource.data);
+      // Attempts are immutable once created.
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /colorAttempts/{attemptId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidColorAttempt(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /standardDeckAttempts/{attemptId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidStandardDeckAttempt(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /astroTarotAttempts/{attemptId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidAstroTarotAttempt(request.resource.data);
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    match /stockAttempts/{attemptId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidStockAttempt(request.resource.data);
+      // Stock attempts might need to be updated with the actual direction later, but for now, let's say they are immutable by the user.
+      // A backend process would update them, or the user can update them if they are the owner and only changing actualDirection/isSuccess.
+      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidStockAttempt(request.resource.data) &&
+                    request.resource.data.userId == resource.data.userId &&
+                    request.resource.data.targetDate == resource.data.targetDate &&
+                    request.resource.data.selectedDirection == resource.data.selectedDirection &&
+                    request.resource.data.timestamp == resource.data.timestamp;
+      allow delete: if false;
+    }
+  }
+}
