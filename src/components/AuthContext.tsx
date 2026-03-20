@@ -68,41 +68,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Ensure user profile exists in Firestore
-        const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        if (!userSnap.exists()) {
-          await setDoc(userRef, {
-            uid: currentUser.uid,
-            email: currentUser.email,
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            createdAt: new Date().toISOString(),
-          });
-        }
-        
-        // Ensure public profile exists in Firestore
-        const publicRef = doc(db, 'users_public', currentUser.uid);
-        const publicSnap = await getDoc(publicRef);
-        if (!publicSnap.exists()) {
-          await setDoc(publicRef, {
-            uid: currentUser.uid,
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            showAvatar: true,
-          });
+        if (localStorage.getItem('profileVerified_' + currentUser.uid)) {
           setPublicProfile({
             displayName: currentUser.displayName,
             photoURL: currentUser.photoURL,
             showAvatar: true,
           });
         } else {
-          const data = publicSnap.data();
-          setPublicProfile({
-            displayName: data.displayName || null,
-            photoURL: data.photoURL || null,
-            showAvatar: data.showAvatar !== false,
-          });
+          // Ensure user profile exists in Firestore
+          const userRef = doc(db, 'users', currentUser.uid);
+          const userSnap = await getDoc(userRef);
+          if (!userSnap.exists()) {
+            await setDoc(userRef, {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              createdAt: new Date().toISOString(),
+            });
+          }
+          
+          // Ensure public profile exists in Firestore
+          const publicRef = doc(db, 'users_public', currentUser.uid);
+          const publicSnap = await getDoc(publicRef);
+          if (!publicSnap.exists()) {
+            await setDoc(publicRef, {
+              uid: currentUser.uid,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              showAvatar: true,
+            });
+            setPublicProfile({
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              showAvatar: true,
+            });
+          } else {
+            const data = publicSnap.data();
+            setPublicProfile({
+              displayName: data.displayName || null,
+              photoURL: data.photoURL || null,
+              showAvatar: data.showAvatar !== false,
+            });
+          }
+          localStorage.setItem('profileVerified_' + currentUser.uid, 'true');
         }
       } else {
         setPublicProfile(null);

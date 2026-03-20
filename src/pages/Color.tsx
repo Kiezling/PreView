@@ -53,7 +53,8 @@ export const ColorTarget: React.FC = () => {
       });
       
       const { actualTarget } = result.data as any;
-      setActualColor(actualTarget);
+      const fullColorObj = COLORS.find(c => c.name === actualTarget) || { name: actualTarget, hex: '#000000' };
+      setActualColor(fullColorObj);
     } catch (error) {
       console.error("Error saving attempt:", error);
     } finally {

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Layers, TrendingUp, Palette, Spade, Trophy } from 'lucide-react';
+import { Star, Layers, TrendingUp, Palette, Spade, Trophy, Headphones } from 'lucide-react';
 import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../components/AuthContext';
@@ -27,6 +27,7 @@ export const Home: React.FC = () => {
   const [stats, setStats] = useState<Record<string, ModeStats>>({
     zener: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
     astroTarot: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
+    auditory: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
     stock: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
     standardDeck: { 
       user: { total: 0, success: 0 }, 
@@ -50,6 +51,7 @@ export const Home: React.FC = () => {
         const modes = [
           { key: 'zener', collection: 'zenerAttempts' },
           { key: 'astroTarot', collection: 'astroTarotAttempts' },
+          { key: 'auditory', collection: 'auditoryAttempts' },
           { key: 'stock', collection: 'stockAttempts' },
           { key: 'standardDeck', collection: 'standardDeckAttempts' },
           { key: 'colorTarget', collection: 'colorAttempts' },
@@ -58,6 +60,7 @@ export const Home: React.FC = () => {
         const newStats: Record<string, ModeStats> = {
           zener: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
           astroTarot: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
+          auditory: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
           stock: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
           standardDeck: { 
             user: { total: 0, success: 0 }, 
@@ -199,6 +202,16 @@ export const Home: React.FC = () => {
       bg: 'bg-white/10',
       border: 'border-white/20',
       stats: stats.astroTarot,
+    },
+    {
+      id: 'auditory',
+      title: 'Auditory',
+      icon: Headphones,
+      path: '/auditory',
+      color: 'text-white',
+      bg: 'bg-white/10',
+      border: 'border-white/20',
+      stats: stats.auditory,
     },
     {
       id: 'stock',

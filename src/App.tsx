@@ -9,6 +9,7 @@ import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Zener } from './pages/Zener';
 import { AstroTarot } from './pages/AstroTarot';
+import { Auditory } from './pages/Auditory';
 import { ColorTarget } from './pages/Color';
 import { Stock } from './pages/Stock';
 import { StandardDeck } from './pages/StandardDeck';
@@ -25,6 +26,7 @@ export default function App() {
             <Route path="color" element={<ColorTarget />} />
             <Route path="standard-deck" element={<StandardDeck />} />
             <Route path="astro-tarot" element={<AstroTarot />} />
+            <Route path="auditory" element={<Auditory />} />
             <Route path="stock" element={<Stock />} />
             <Route path="profile" element={<Profile />} />
           </Route>
