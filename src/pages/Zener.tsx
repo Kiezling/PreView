@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Star, RefreshCw, CheckCircle2, XCircle, Circle, Plus, Waves, Square, Star as StarIcon } from 'lucide-react';
-import { collection, addDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId, cryptoRandom, getDeviceType } from '../lib/utils';
+import { generateTargetId, getDeviceType } from '../lib/utils';
 
 const CARDS = ['Circle', 'Cross', 'Waves', 'Square', 'Star'];
 

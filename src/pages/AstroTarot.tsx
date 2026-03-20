@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Layers, RefreshCw, CheckCircle2, XCircle } from 'lucide-react';
-import { collection, addDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId, cryptoRandom, getDeviceType } from '../lib/utils';
+import { generateTargetId, getDeviceType } from '../lib/utils';
 
 const ATTRIBUTES = {
   modality: ['Cardinal', 'Fixed', 'Mutable'],

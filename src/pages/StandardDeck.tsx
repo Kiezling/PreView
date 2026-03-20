@@ -1,11 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { Spade, RefreshCw, ArrowLeft } from 'lucide-react';
-import { collection, addDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId, cryptoRandom, getDeviceType } from '../lib/utils';
+import { generateTargetId, getDeviceType } from '../lib/utils';
 
 const SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
 const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
