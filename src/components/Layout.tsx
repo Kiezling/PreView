@@ -14,7 +14,6 @@ export const Layout: React.FC = () => {
     { name: 'Color Target', path: '/color', icon: Palette },
     { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
     { name: 'Astro-Tarot', path: '/astro-tarot', icon: Layers },
-    { name: 'Auditory', path: '/auditory', icon: Headphones },
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
   ];
 
@@ -122,7 +121,7 @@ export const Layout: React.FC = () => {
             <Brain className="w-24 h-24 text-yellow-500/50 mb-6" />
             <h1 className="text-4xl font-bold tracking-tight mb-4">Welcome to PreView</h1>
             <p className="text-xl text-neutral-400 max-w-2xl mb-8">
-              A platform for practicing and recording your remote viewing abilities across different modalities including Zener Cards, Color Targets, Astro-Tarot, Auditory Targets, and Stock Market predictions.
+              A platform for practicing and recording your remote viewing abilities across different modalities including Zener Cards, Color Targets, Astro-Tarot, and Stock Market predictions.
             </p>
             <button
               onClick={login}

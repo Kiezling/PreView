@@ -65,7 +65,6 @@ export const Stock: React.FC = () => {
 
   const startTimeRef = useRef<number>(Date.now());
   const sequenceIndexRef = useRef<number>(0);
-  const sketchCache = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let isMounted = true;
@@ -89,7 +88,7 @@ export const Stock: React.FC = () => {
         setActualDirection('Pending');
         setIsRevealed(false);
         
-        const cachedData = sketchCache.current[dateStr];
+        const cachedData = sessionStorage.getItem('sketch_' + dateStr);
         if (cachedData) {
           try {
             // Try parsing as JSON (strokes array)
@@ -176,40 +175,52 @@ export const Stock: React.FC = () => {
       // If we saved a data URL instead of JSON, we would draw it here.
       // But we are saving JSON strokes for better editing support.
       const dateStr = format(targetDate, 'yyyy-MM-dd');
-      const cachedData = sketchCache.current[dateStr];
+      const cachedData = sessionStorage.getItem('sketch_' + dateStr);
+      
+      const drawAllStrokes = () => {
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        const drawStroke = (stroke: Stroke) => {
+          if (stroke.points.length === 0) return;
+          ctx.beginPath();
+          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
+          for (let i = 1; i < stroke.points.length; i++) {
+            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
+          }
+          if (stroke.isEraser) {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.strokeStyle = 'rgba(0,0,0,1)';
+          } else {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.strokeStyle = stroke.color;
+          }
+          ctx.lineWidth = stroke.width;
+          ctx.stroke();
+        };
+
+        strokes.forEach(drawStroke);
+        if (currentStroke) drawStroke(currentStroke);
+        
+        ctx.globalCompositeOperation = 'source-over';
+        
+        if (strokes.length > 0 || currentStroke) {
+          sessionStorage.setItem('sketch_' + format(targetDate, 'yyyy-MM-dd'), canvas.toDataURL());
+        }
+      };
+
       if (cachedData && cachedData.startsWith('data:image')) {
         const img = new Image();
         img.onload = () => {
-          if (isMounted) ctx.drawImage(img, 0, 0);
+          if (isMounted) {
+            ctx.drawImage(img, 0, 0);
+            drawAllStrokes();
+          }
         };
         img.src = cachedData;
+      } else {
+        drawAllStrokes();
       }
-
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-
-      const drawStroke = (stroke: Stroke) => {
-        if (stroke.points.length === 0) return;
-        ctx.beginPath();
-        ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-        for (let i = 1; i < stroke.points.length; i++) {
-          ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-        }
-        if (stroke.isEraser) {
-          ctx.globalCompositeOperation = 'destination-out';
-          ctx.strokeStyle = 'rgba(0,0,0,1)';
-        } else {
-          ctx.globalCompositeOperation = 'source-over';
-          ctx.strokeStyle = stroke.color;
-        }
-        ctx.lineWidth = stroke.width;
-        ctx.stroke();
-      };
-
-      strokes.forEach(drawStroke);
-      if (currentStroke) drawStroke(currentStroke);
-      
-      ctx.globalCompositeOperation = 'source-over';
     }
 
     return () => { isMounted = false; };
@@ -220,10 +231,10 @@ export const Stock: React.FC = () => {
     
     // Save current canvas data URL to cache
     if (canvasRef.current) {
-      sketchCache.current[oldDateStr] = canvasRef.current.toDataURL();
+      sessionStorage.setItem('sketch_' + oldDateStr, canvasRef.current.toDataURL());
     } else {
       // Fallback to strokes if canvas isn't available
-      sketchCache.current[oldDateStr] = JSON.stringify(strokes);
+      sessionStorage.setItem('sketch_' + oldDateStr, JSON.stringify(strokes));
     }
     
     setTargetDate(newDate);
@@ -346,7 +357,7 @@ export const Stock: React.FC = () => {
 
       <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 md:p-12 relative overflow-hidden">
         
-        {attemptState === 'NoAttempt' && (
+        {selectedDirection === null && (
           <>
             {/* Sketchpad */}
             <div className="bg-white rounded-xl overflow-hidden border border-neutral-300 mb-8 max-w-2xl mx-auto">
@@ -394,8 +405,9 @@ export const Stock: React.FC = () => {
                     if (canvasRef.current) {
                       const ctx = canvasRef.current.getContext('2d');
                       if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                      sessionStorage.removeItem('sketch_' + format(targetDate, 'yyyy-MM-dd'));
                     }
-                  }} disabled={(strokes.length === 0 && !sketchCache.current[format(targetDate, 'yyyy-MM-dd')]) || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
+                  }} disabled={(strokes.length === 0 && !sessionStorage.getItem('sketch_' + format(targetDate, 'yyyy-MM-dd'))) || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
                     <Trash2 className="w-5 h-5 text-red-600" />
                   </button>
                 </div>
@@ -479,7 +491,7 @@ export const Stock: React.FC = () => {
           </>
         )}
 
-        {attemptState === 'Pending' && (
+        {selectedDirection !== null && actualDirection === 'Pending' && (
           <div className="text-center py-12">
             <RefreshCw className="w-12 h-12 text-white animate-spin mx-auto mb-4" />
             <p className="text-xl font-semibold text-white">Prediction Recorded. Waiting for Market Close.</p>
@@ -487,7 +499,7 @@ export const Stock: React.FC = () => {
           </div>
         )}
 
-        {attemptState === 'Resolved' && (
+        {selectedDirection !== null && actualDirection !== 'Pending' && (
           <motion.div 
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
