@@ -13,6 +13,7 @@ import { ColorTarget } from './pages/Color';
 import { Stock } from './pages/Stock';
 import { StandardDeck } from './pages/StandardDeck';
 import { Profile } from './pages/Profile';
+import { Admin } from './pages/Admin';
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="astro-tarot" element={<AstroTarot />} />
             <Route path="stock" element={<Stock />} />
             <Route path="profile" element={<Profile />} />
+            <Route path="admin" element={<Admin />} />
           </Route>
         </Routes>
       </Router>

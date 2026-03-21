@@ -57,9 +57,8 @@ export const Stock: React.FC = () => {
   // Sketchpad State
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isDrawing, setIsDrawing] = useState(false);
-  const [strokes, setStrokes] = useState<Stroke[]>([]);
-  const [redoStack, setRedoStack] = useState<Stroke[]>([]);
-  const [currentStroke, setCurrentStroke] = useState<Stroke | null>(null);
+  const [history, setHistory] = useState<string[]>([]);
+  const [historyStep, setHistoryStep] = useState<number>(-1);
   const [currentColor, setCurrentColor] = useState('#000000');
   const [isEraser, setIsEraser] = useState(false);
 
@@ -89,23 +88,13 @@ export const Stock: React.FC = () => {
         setIsRevealed(false);
         
         const cachedData = sessionStorage.getItem('sketch_' + dateStr);
-        if (cachedData) {
-          try {
-            // Try parsing as JSON (strokes array)
-            const parsed = JSON.parse(cachedData);
-            if (Array.isArray(parsed)) {
-              setStrokes(parsed);
-            } else {
-              setStrokes([]);
-            }
-          } catch (e) {
-            // If it's a data URL, we'd draw it on the canvas, but we'll stick to strokes for now
-            setStrokes([]);
-          }
+        if (cachedData && cachedData.startsWith('data:image')) {
+          setHistory([cachedData]);
+          setHistoryStep(0);
         } else {
-          setStrokes([]);
+          setHistory([]);
+          setHistoryStep(-1);
         }
-        setRedoStack([]);
       }
       
       if (isMounted) {
@@ -172,59 +161,20 @@ export const Stock: React.FC = () => {
     if (isMounted) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       
-      // If we saved a data URL instead of JSON, we would draw it here.
-      // But we are saving JSON strokes for better editing support.
-      const dateStr = format(targetDate, 'yyyy-MM-dd');
-      const cachedData = sessionStorage.getItem('sketch_' + dateStr);
-      
-      const drawAllStrokes = () => {
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        const drawStroke = (stroke: Stroke) => {
-          if (stroke.points.length === 0) return;
-          ctx.beginPath();
-          ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-          for (let i = 1; i < stroke.points.length; i++) {
-            ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-          }
-          if (stroke.isEraser) {
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.strokeStyle = 'rgba(0,0,0,1)';
-          } else {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.strokeStyle = stroke.color;
-          }
-          ctx.lineWidth = stroke.width;
-          ctx.stroke();
-        };
-
-        strokes.forEach(drawStroke);
-        if (currentStroke) drawStroke(currentStroke);
-        
-        ctx.globalCompositeOperation = 'source-over';
-        
-        if (strokes.length > 0 || currentStroke) {
-          sessionStorage.setItem('sketch_' + format(targetDate, 'yyyy-MM-dd'), canvas.toDataURL());
-        }
-      };
-
-      if (cachedData && cachedData.startsWith('data:image')) {
+      if (historyStep >= 0 && history[historyStep]) {
         const img = new Image();
         img.onload = () => {
           if (isMounted) {
+            ctx.globalCompositeOperation = 'source-over';
             ctx.drawImage(img, 0, 0);
-            drawAllStrokes();
           }
         };
-        img.src = cachedData;
-      } else {
-        drawAllStrokes();
+        img.src = history[historyStep];
       }
     }
 
     return () => { isMounted = false; };
-  }, [strokes, currentStroke, targetDate]);
+  }, [historyStep, history, targetDate]);
 
   const handleDateChange = (newDate: Date) => {
     const oldDateStr = format(targetDate, 'yyyy-MM-dd');
@@ -232,9 +182,6 @@ export const Stock: React.FC = () => {
     // Save current canvas data URL to cache
     if (canvasRef.current) {
       sessionStorage.setItem('sketch_' + oldDateStr, canvasRef.current.toDataURL());
-    } else {
-      // Fallback to strokes if canvas isn't available
-      sessionStorage.setItem('sketch_' + oldDateStr, JSON.stringify(strokes));
     }
     
     setTargetDate(newDate);
@@ -268,24 +215,51 @@ export const Stock: React.FC = () => {
     const coords = getCoordinates(e);
     if (!coords) return;
     setIsDrawing(true);
-    setCurrentStroke({ points: [coords], color: currentColor, width: isEraser ? 20 : 3, isEraser });
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx) {
+      ctx.beginPath();
+      ctx.moveTo(coords.x, coords.y);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = isEraser ? 20 : 3;
+      if (isEraser) {
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.strokeStyle = 'rgba(0,0,0,1)';
+      } else {
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = currentColor;
+      }
+    }
   };
 
   const draw = (e: React.MouseEvent | React.TouchEvent) => {
     if (!isDrawing || isRevealed || attemptState !== 'NoAttempt') return;
     e.preventDefault();
     const coords = getCoordinates(e);
-    if (!coords || !currentStroke) return;
-    setCurrentStroke(prev => prev ? { ...prev, points: [...prev.points, coords] } : null);
+    if (!coords) return;
+    
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (ctx) {
+      ctx.lineTo(coords.x, coords.y);
+      ctx.stroke();
+    }
   };
 
   const stopDrawing = () => {
     if (!isDrawing || isRevealed || attemptState !== 'NoAttempt') return;
     setIsDrawing(false);
-    if (currentStroke) {
-      setStrokes(prev => [...prev, currentStroke]);
-      setRedoStack([]);
-      setCurrentStroke(null);
+    
+    const canvas = canvasRef.current;
+    if (canvas) {
+      const dataUrl = canvas.toDataURL();
+      const newHistory = history.slice(0, historyStep + 1);
+      newHistory.push(dataUrl);
+      setHistory(newHistory);
+      setHistoryStep(newHistory.length - 1);
+      sessionStorage.setItem('sketch_' + format(targetDate, 'yyyy-MM-dd'), dataUrl);
     }
   };
 
@@ -382,32 +356,30 @@ export const Stock: React.FC = () => {
                 </div>
                 <div className="flex gap-2">
                   <button onClick={() => {
-                    if (strokes.length === 0) return;
-                    const newStrokes = [...strokes];
-                    const popped = newStrokes.pop();
-                    setStrokes(newStrokes);
-                    if (popped) setRedoStack([...redoStack, popped]);
-                  }} disabled={strokes.length === 0 || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
+                    if (historyStep > 0) {
+                      setHistoryStep(prev => prev - 1);
+                    } else if (historyStep === 0) {
+                      setHistoryStep(-1);
+                    }
+                  }} disabled={historyStep < 0 || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
                     <Undo className="w-5 h-5 text-neutral-700" />
                   </button>
                   <button onClick={() => {
-                    if (redoStack.length === 0) return;
-                    const newRedo = [...redoStack];
-                    const popped = newRedo.pop();
-                    setRedoStack(newRedo);
-                    if (popped) setStrokes([...strokes, popped]);
-                  }} disabled={redoStack.length === 0 || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
+                    if (historyStep < history.length - 1) {
+                      setHistoryStep(prev => prev + 1);
+                    }
+                  }} disabled={historyStep >= history.length - 1 || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
                     <Redo className="w-5 h-5 text-neutral-700" />
                   </button>
                   <button onClick={() => {
-                    setStrokes([]);
-                    setRedoStack([]);
+                    setHistory([]);
+                    setHistoryStep(-1);
                     if (canvasRef.current) {
                       const ctx = canvasRef.current.getContext('2d');
                       if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
                       sessionStorage.removeItem('sketch_' + format(targetDate, 'yyyy-MM-dd'));
                     }
-                  }} disabled={(strokes.length === 0 && !sessionStorage.getItem('sketch_' + format(targetDate, 'yyyy-MM-dd'))) || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
+                  }} disabled={(historyStep < 0 && !sessionStorage.getItem('sketch_' + format(targetDate, 'yyyy-MM-dd'))) || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
                     <Trash2 className="w-5 h-5 text-red-600" />
                   </button>
                 </div>
