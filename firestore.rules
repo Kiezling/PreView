@@ -24,10 +24,6 @@ service cloud.firestore {
     //   - actualCard: string (required) - The actual randomly generated card.
     //   - isSuccess: boolean (required) - Whether the user guessed correctly.
     //   - timestamp: string (required) - When the attempt was made.
-    //   - timeToDecisionMs: number (optional) - Telemetry
-    //   - sessionSequenceIndex: number (optional) - Telemetry
-    //   - localTimezone: string (optional) - Telemetry
-    //   - deviceType: string (optional) - Telemetry
     //
     // Collection: colorAttempts
     // Document ID: {attemptId}
@@ -38,10 +34,6 @@ service cloud.firestore {
     //   - actualColor: string (required) - The actual randomly generated color.
     //   - isSuccess: boolean (required) - Whether the user guessed correctly.
     //   - timestamp: string (required) - When the attempt was made.
-    //   - timeToDecisionMs: number (optional) - Telemetry
-    //   - sessionSequenceIndex: number (optional) - Telemetry
-    //   - localTimezone: string (optional) - Telemetry
-    //   - deviceType: string (optional) - Telemetry
     //
     // Collection: standardDeckAttempts
     // Document ID: {attemptId}
@@ -53,10 +45,6 @@ service cloud.firestore {
     //   - actualCard: map (required) - The actual randomly generated card.
     //   - isSuccess: boolean (required) - Whether the user guessed correctly.
     //   - timestamp: string (required) - When the attempt was made.
-    //   - timeToDecisionMs: number (optional) - Telemetry
-    //   - sessionSequenceIndex: number (optional) - Telemetry
-    //   - localTimezone: string (optional) - Telemetry
-    //   - deviceType: string (optional) - Telemetry
     //
     // Collection: astroTarotAttempts
     // Document ID: {attemptId}
@@ -65,13 +53,8 @@ service cloud.firestore {
     //   - targetId: string (required) - The target identifier for the attempt.
     //   - selectedAttributes: map (required) - The attributes the user selected.
     //   - actualAttributes: map (required) - The actual randomly generated attributes.
-    //   - axisResults: map (required) - The results for each axis.
-    //   - isSuccess: boolean (optional) - Whether the user guessed correctly.
+    //   - isSuccess: boolean (required) - Whether the user guessed correctly.
     //   - timestamp: string (required) - When the attempt was made.
-    //   - timeToDecisionMs: number (optional) - Telemetry
-    //   - sessionSequenceIndex: number (optional) - Telemetry
-    //   - localTimezone: string (optional) - Telemetry
-    //   - deviceType: string (optional) - Telemetry
     //
     // Collection: stockAttempts
     // Document ID: {attemptId}
@@ -82,10 +65,6 @@ service cloud.firestore {
     //   - actualDirection: string (required) - The actual direction of the market.
     //   - isSuccess: boolean (optional) - Whether the user guessed correctly.
     //   - timestamp: string (required) - When the attempt was made.
-    //   - timeToDecisionMs: number (optional) - Telemetry
-    //   - sessionSequenceIndex: number (optional) - Telemetry
-    //   - localTimezone: string (optional) - Telemetry
-    //   - deviceType: string (optional) - Telemetry
     //
     // ===============================================================
 
@@ -152,7 +131,7 @@ service cloud.firestore {
     }
 
     function isValidZenerAttempt(data) {
-      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedCard', 'actualCard', 'isSuccess', 'timestamp', 'timeToDecisionMs', 'sessionSequenceIndex', 'localTimezone', 'deviceType']) &&
+      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedCard', 'actualCard', 'isSuccess', 'timestamp']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
              data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
              data.selectedCard in ['Circle', 'Cross', 'Waves', 'Square', 'Star'] &&
@@ -162,7 +141,7 @@ service cloud.firestore {
     }
 
     function isValidColorAttempt(data) {
-      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedColor', 'actualColor', 'isSuccess', 'timestamp', 'timeToDecisionMs', 'sessionSequenceIndex', 'localTimezone', 'deviceType']) &&
+      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedColor', 'actualColor', 'isSuccess', 'timestamp']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
              data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
              data.selectedColor in ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Violet'] &&
@@ -172,7 +151,7 @@ service cloud.firestore {
     }
 
     function isValidStandardDeckAttempt(data) {
-      return hasOnlyAllowedFields(['userId', 'targetId', 'guessType', 'selectedOption', 'actualCard', 'isSuccess', 'timestamp', 'timeToDecisionMs', 'sessionSequenceIndex', 'localTimezone', 'deviceType']) &&
+      return hasOnlyAllowedFields(['userId', 'targetId', 'guessType', 'selectedOption', 'actualCard', 'isSuccess', 'timestamp']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
              data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
              data.guessType in ['color', 'suit', 'value'] &&
@@ -187,35 +166,22 @@ service cloud.firestore {
     }
 
     function isValidAstroTarotAttempt(data) {
-      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedAttributes', 'actualAttributes', 'axisResults', 'isSuccess', 'timestamp', 'timeToDecisionMs', 'sessionSequenceIndex', 'localTimezone', 'deviceType']) &&
+      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedAttributes', 'actualAttributes', 'isSuccess', 'timestamp']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
              data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
              data.selectedAttributes is map &&
              data.actualAttributes is map &&
-             data.axisResults is map &&
-             (!( 'isSuccess' in data ) || data.isSuccess is bool) &&
+             data.isSuccess is bool &&
              isValidDateString(data.timestamp);
     }
 
     function isValidStockAttempt(data) {
-      return hasOnlyAllowedFields(['userId', 'targetDate', 'selectedDirection', 'actualDirection', 'isSuccess', 'timestamp', 'timeToDecisionMs', 'sessionSequenceIndex', 'localTimezone', 'deviceType']) &&
+      return hasOnlyAllowedFields(['userId', 'targetDate', 'selectedDirection', 'actualDirection', 'isSuccess', 'timestamp']) &&
              data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
              data.targetDate is string && data.targetDate.size() > 0 && data.targetDate.size() < 64 &&
              data.selectedDirection in ['Higher', 'Lower'] &&
              data.actualDirection in ['Higher', 'Lower', 'Pending'] &&
              (!( 'isSuccess' in data ) || data.isSuccess is bool) &&
-             isValidDateString(data.timestamp);
-    }
-
-    function isValidAuditoryAttempt(data) {
-      return hasOnlyAllowedFields(['userId', 'targetId', 'selectedCategory', 'selectedPolarity', 'actualCategory', 'actualPolarity', 'isSuccess', 'timestamp', 'timeToDecisionMs', 'sessionSequenceIndex', 'localTimezone', 'deviceType']) &&
-             data.userId is string && data.userId.size() > 0 && data.userId.size() < 128 &&
-             data.targetId is string && data.targetId.size() > 0 && data.targetId.size() < 128 &&
-             data.selectedCategory in ['Frequency', 'Environment', 'Rhythm'] &&
-             data.selectedPolarity in ['High Pitch', 'Low Pitch', 'White Noise', 'Brown Noise', 'Fast/Erratic', 'Slow/Pulsing'] &&
-             data.actualCategory in ['Frequency', 'Environment', 'Rhythm'] &&
-             data.actualPolarity in ['High Pitch', 'Low Pitch', 'White Noise', 'Brown Noise', 'Fast/Erratic', 'Slow/Pulsing'] &&
-             data.isSuccess is bool &&
              isValidDateString(data.timestamp);
     }
 
@@ -238,7 +204,7 @@ service cloud.firestore {
 
     match /zenerAttempts/{attemptId} {
       // Users can read all attempts for global stats
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner();
       // Attempts are immutable once created.
       allow create: if false;
       allow update: if false;
@@ -246,43 +212,37 @@ service cloud.firestore {
     }
 
     match /colorAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /standardDeckAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /astroTarotAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /auditoryAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner();
       allow create: if false;
       allow update: if false;
       allow delete: if false;
     }
 
     match /stockAttempts/{attemptId} {
-      allow read: if isAuthenticated();
+      allow read: if isDocOwner();
       allow create: if false;
-      // Stock attempts might need to be updated with the actual direction later, but for now, let's say they are immutable by the user.
-      // A backend process would update them, or the user can update them if they are the owner and only changing actualDirection/isSuccess.
-      allow update: if isAuthenticated() && resource.data.userId == request.auth.uid && isValidStockAttempt(request.resource.data) &&
-                    request.resource.data.userId == resource.data.userId &&
-                    request.resource.data.targetDate == resource.data.targetDate &&
-                    request.resource.data.selectedDirection == resource.data.selectedDirection &&
-                    request.resource.data.timestamp == resource.data.timestamp;
+      allow update: if false;
       allow delete: if false;
     }
   }
