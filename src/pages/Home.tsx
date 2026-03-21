@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Star, Layers, TrendingUp, Palette, Spade, Trophy, Headphones } from 'lucide-react';
-import { collection, getDocs, getDoc, doc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { Star, Layers, TrendingUp, Palette, Spade } from 'lucide-react';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
 import { motion } from 'motion/react';
 
@@ -15,19 +16,11 @@ interface ModeStats {
   }>;
 }
 
-interface LeaderboardEntry {
-  uid: string;
-  name: string;
-  accuracy: number;
-  total: number;
-}
-
 export const Home: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<Record<string, ModeStats>>({
     zener: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
     astroTarot: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-    auditory: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
     stock: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
     standardDeck: { 
       user: { total: 0, success: 0 }, 
@@ -40,18 +33,17 @@ export const Home: React.FC = () => {
     },
     colorTarget: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
   });
-  const [leaderboards, setLeaderboards] = useState<Record<string, LeaderboardEntry[]>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!user) return;
+    let isMounted = true;
 
     const fetchAllStats = async () => {
       try {
         const modes = [
           { key: 'zener', collection: 'zenerAttempts' },
           { key: 'astroTarot', collection: 'astroTarotAttempts' },
-          { key: 'auditory', collection: 'auditoryAttempts' },
           { key: 'stock', collection: 'stockAttempts' },
           { key: 'standardDeck', collection: 'standardDeckAttempts' },
           { key: 'colorTarget', collection: 'colorAttempts' },
@@ -60,7 +52,6 @@ export const Home: React.FC = () => {
         const newStats: Record<string, ModeStats> = {
           zener: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
           astroTarot: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-          auditory: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
           stock: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
           standardDeck: { 
             user: { total: 0, success: 0 }, 
@@ -74,107 +65,86 @@ export const Home: React.FC = () => {
           colorTarget: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
         };
 
-        const newLeaderboards: Record<string, LeaderboardEntry[]> = {};
-
+        // Fetch personal stats securely
         for (const mode of modes) {
-          const snapshot = await getDocs(collection(db, mode.collection));
-          const modeUserAggregates: Record<string, { total: number; success: number }> = {};
-          const subModeUserAggregates: Record<string, Record<string, { total: number; success: number }>> = {};
+          const q = query(
+            collection(db, mode.collection),
+            where('userId', '==', user.uid)
+          );
+          const snapshot = await getDocs(q);
 
           snapshot.forEach(doc => {
             const data = doc.data();
             const isSuccess = data.isSuccess === true;
-            const uid = data.userId;
 
-            // Global stats
-            newStats[mode.key].global.total++;
-            if (isSuccess) newStats[mode.key].global.success++;
-
-            // User stats
-            if (uid === user.uid) {
-              newStats[mode.key].user.total++;
-              if (isSuccess) newStats[mode.key].user.success++;
-            }
+            newStats[mode.key].user.total++;
+            if (isSuccess) newStats[mode.key].user.success++;
 
             // Sub-stats for standard deck
             if (mode.key === 'standardDeck' && data.guessType && newStats.standardDeck.subStats) {
               const guessType = data.guessType as 'color' | 'suit' | 'value';
               if (newStats.standardDeck.subStats[guessType]) {
-                newStats.standardDeck.subStats[guessType].global.total++;
-                if (isSuccess) newStats.standardDeck.subStats[guessType].global.success++;
-                
-                if (uid === user.uid) {
-                  newStats.standardDeck.subStats[guessType].user.total++;
-                  if (isSuccess) newStats.standardDeck.subStats[guessType].user.success++;
-                }
+                newStats.standardDeck.subStats[guessType].user.total++;
+                if (isSuccess) newStats.standardDeck.subStats[guessType].user.success++;
               }
-
-              if (!subModeUserAggregates[guessType]) subModeUserAggregates[guessType] = {};
-              if (!subModeUserAggregates[guessType][uid]) subModeUserAggregates[guessType][uid] = { total: 0, success: 0 };
-              subModeUserAggregates[guessType][uid].total++;
-              if (isSuccess) subModeUserAggregates[guessType][uid].success++;
             }
-
-            // Leaderboard aggregates for this mode
-            if (!modeUserAggregates[uid]) modeUserAggregates[uid] = { total: 0, success: 0 };
-            modeUserAggregates[uid].total++;
-            if (isSuccess) modeUserAggregates[uid].success++;
           });
+        }
 
-          // Compute leaderboard for this mode
-          const eligibleUsers = Object.entries(modeUserAggregates)
-            .filter(([_, s]) => s.total >= 50)
-            .map(([uid, s]) => ({
-              uid,
-              accuracy: (s.success / s.total) * 100,
-              total: s.total,
-            }))
-            .sort((a, b) => b.accuracy - a.accuracy)
-            .slice(0, 3);
+        // Fetch global stats via Cloud Function
+        const getGlobalStats = httpsCallable(functions, 'getGlobalStats');
+        const globalStatsResult = await getGlobalStats();
+        const globalData = globalStatsResult.data as any;
 
-          newLeaderboards[mode.key] = await Promise.all(
-            eligibleUsers.map(async (u) => {
-              const userDoc = await getDoc(doc(db, 'users_public', u.uid));
-              const name = userDoc.exists() ? userDoc.data().displayName || 'Anonymous' : 'Anonymous';
-              return { ...u, name };
-            })
-          );
-
-          if (mode.key === 'standardDeck') {
-            for (const guessType of ['color', 'suit', 'value']) {
-              if (subModeUserAggregates[guessType]) {
-                const subEligibleUsers = Object.entries(subModeUserAggregates[guessType])
-                  .filter(([_, s]) => s.total >= 50)
-                  .map(([uid, s]) => ({
-                    uid,
-                    accuracy: (s.success / s.total) * 100,
-                    total: s.total,
-                  }))
-                  .sort((a, b) => b.accuracy - a.accuracy)
-                  .slice(0, 3);
-
-                newLeaderboards[`standardDeck_${guessType}`] = await Promise.all(
-                  subEligibleUsers.map(async (u) => {
-                    const userDoc = await getDoc(doc(db, 'users_public', u.uid));
-                    const name = userDoc.exists() ? userDoc.data().displayName || 'Anonymous' : 'Anonymous';
-                    return { ...u, name };
-                  })
-                );
-              }
+        if (globalData) {
+          if (globalData.zenerAttempts) {
+            newStats.zener.global.total = globalData.zenerAttempts.total || 0;
+            newStats.zener.global.success = globalData.zenerAttempts.hits || 0;
+          }
+          if (globalData.astroTarotAttempts) {
+            newStats.astroTarot.global.total = globalData.astroTarotAttempts.total || 0;
+            newStats.astroTarot.global.success = globalData.astroTarotAttempts.hits || 0;
+          }
+          if (globalData.stockAttempts) {
+            newStats.stock.global.total = globalData.stockAttempts.total || 0;
+            newStats.stock.global.success = globalData.stockAttempts.hits || 0;
+          }
+          if (globalData.colorAttempts) {
+            newStats.colorTarget.global.total = globalData.colorAttempts.total || 0;
+            newStats.colorTarget.global.success = globalData.colorAttempts.hits || 0;
+          }
+          if (globalData.standardDeckAttempts) {
+            newStats.standardDeck.global.total = globalData.standardDeckAttempts.total || 0;
+            newStats.standardDeck.global.success = globalData.standardDeckAttempts.hits || 0;
+            
+            if (globalData.standardDeckAttempts.subStats && newStats.standardDeck.subStats) {
+              ['color', 'suit', 'value'].forEach(type => {
+                if (globalData.standardDeckAttempts.subStats[type]) {
+                  newStats.standardDeck.subStats![type].global.total = globalData.standardDeckAttempts.subStats[type].total || 0;
+                  newStats.standardDeck.subStats![type].global.success = globalData.standardDeckAttempts.subStats[type].hits || 0;
+                }
+              });
             }
           }
         }
 
-        setStats(newStats);
-        setLeaderboards(newLeaderboards);
+        if (isMounted) {
+          setStats(newStats);
+        }
       } catch (error) {
         console.error("Error fetching stats:", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchAllStats();
+
+    return () => {
+      isMounted = false;
+    };
   }, [user]);
 
   const calculateAccuracy = (success: number, total: number) => {
@@ -202,16 +172,6 @@ export const Home: React.FC = () => {
       bg: 'bg-white/10',
       border: 'border-white/20',
       stats: stats.astroTarot,
-    },
-    {
-      id: 'auditory',
-      title: 'Auditory',
-      icon: Headphones,
-      path: '/auditory',
-      color: 'text-white',
-      bg: 'bg-white/10',
-      border: 'border-white/20',
-      stats: stats.auditory,
     },
     {
       id: 'stock',
@@ -345,92 +305,6 @@ export const Home: React.FC = () => {
             </Link>
           );
         })}
-      </div>
-
-      <div className="pt-8 border-t border-neutral-800">
-        <div className="flex flex-col items-center mb-12">
-          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-yellow-500/10 mb-4">
-            <Trophy className="w-6 h-6 text-yellow-500" />
-          </div>
-          <h2 className="text-3xl font-bold text-white">Top Clairvoyants</h2>
-          <p className="text-neutral-400 mt-2">Highest accuracy per category (min. 50 attempts)</p>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {cards.flatMap(card => {
-            if (card.id === 'standardDeck') {
-              return ['color', 'suit', 'value'].map(guessType => {
-                const modeLeaderboard = leaderboards[`standardDeck_${guessType}`] || [];
-                const title = `Standard Deck (${guessType.charAt(0).toUpperCase() + guessType.slice(1)})`;
-                return (
-                  <div key={`standardDeck_${guessType}`} className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
-                    <div className="flex items-center gap-3 mb-6">
-                      <card.icon className="w-5 h-5 text-neutral-400" />
-                      <h3 className="text-lg font-semibold text-white">{title}</h3>
-                    </div>
-                    
-                    {modeLeaderboard.length > 0 ? (
-                      <div className="space-y-3">
-                        {modeLeaderboard.map((leader, idx) => (
-                          <div key={leader.uid} className="flex items-center justify-between bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                            <div className="flex items-center gap-4">
-                              <span className={`text-xl font-bold ${idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-neutral-300' : idx === 2 ? 'text-amber-600' : 'text-neutral-500'}`}>
-                                #{idx + 1}
-                              </span>
-                              <span className="font-medium text-white truncate max-w-[100px]">{leader.name}</span>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-lg font-mono text-white">{leader.accuracy.toFixed(1)}%</p>
-                              <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{leader.total} att</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 bg-neutral-950 rounded-xl border border-neutral-800 border-dashed">
-                        <p className="text-sm text-neutral-500">No users with 50+ attempts</p>
-                      </div>
-                    )}
-                  </div>
-                );
-              });
-            }
-
-            const modeLeaderboard = leaderboards[card.id] || [];
-            
-            return [
-              <div key={card.id} className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6">
-                <div className="flex items-center gap-3 mb-6">
-                  <card.icon className="w-5 h-5 text-neutral-400" />
-                  <h3 className="text-lg font-semibold text-white">{card.title}</h3>
-                </div>
-                
-                {modeLeaderboard.length > 0 ? (
-                  <div className="space-y-3">
-                    {modeLeaderboard.map((leader, idx) => (
-                      <div key={leader.uid} className="flex items-center justify-between bg-neutral-950 p-4 rounded-xl border border-neutral-800">
-                        <div className="flex items-center gap-4">
-                          <span className={`text-xl font-bold ${idx === 0 ? 'text-yellow-500' : idx === 1 ? 'text-neutral-300' : idx === 2 ? 'text-amber-600' : 'text-neutral-500'}`}>
-                            #{idx + 1}
-                          </span>
-                          <span className="font-medium text-white truncate max-w-[100px]">{leader.name}</span>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-lg font-mono text-white">{leader.accuracy.toFixed(1)}%</p>
-                          <p className="text-[10px] text-neutral-500 uppercase tracking-wider">{leader.total} att</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-8 bg-neutral-950 rounded-xl border border-neutral-800 border-dashed">
-                    <p className="text-sm text-neutral-500">No users with 50+ attempts</p>
-                  </div>
-                )}
-              </div>
-            ];
-          })}
-        </div>
       </div>
     </motion.div>
   );
