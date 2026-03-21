@@ -65,6 +65,7 @@ export const Stock: React.FC = () => {
 
   const startTimeRef = useRef<number>(Date.now());
   const sequenceIndexRef = useRef<number>(0);
+  const sketchCache = useRef<Record<string, string>>({});
 
   useEffect(() => {
     let isMounted = true;
@@ -78,6 +79,8 @@ export const Stock: React.FC = () => {
     let isMounted = true;
 
     const fetchData = async () => {
+      const dateStr = format(targetDate, 'yyyy-MM-dd');
+
       if (isMounted) {
         setIsLoadingClose(true);
         setPriorClose(null);
@@ -85,11 +88,26 @@ export const Stock: React.FC = () => {
         setSelectedDirection(null);
         setActualDirection('Pending');
         setIsRevealed(false);
-        setStrokes([]);
+        
+        const cachedData = sketchCache.current[dateStr];
+        if (cachedData) {
+          try {
+            // Try parsing as JSON (strokes array)
+            const parsed = JSON.parse(cachedData);
+            if (Array.isArray(parsed)) {
+              setStrokes(parsed);
+            } else {
+              setStrokes([]);
+            }
+          } catch (e) {
+            // If it's a data URL, we'd draw it on the canvas, but we'll stick to strokes for now
+            setStrokes([]);
+          }
+        } else {
+          setStrokes([]);
+        }
         setRedoStack([]);
       }
-
-      const dateStr = format(targetDate, 'yyyy-MM-dd');
       
       if (isMounted) {
         setImages({
@@ -154,6 +172,19 @@ export const Stock: React.FC = () => {
 
     if (isMounted) {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      // If we saved a data URL instead of JSON, we would draw it here.
+      // But we are saving JSON strokes for better editing support.
+      const dateStr = format(targetDate, 'yyyy-MM-dd');
+      const cachedData = sketchCache.current[dateStr];
+      if (cachedData && cachedData.startsWith('data:image')) {
+        const img = new Image();
+        img.onload = () => {
+          if (isMounted) ctx.drawImage(img, 0, 0);
+        };
+        img.src = cachedData;
+      }
+
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
@@ -182,7 +213,21 @@ export const Stock: React.FC = () => {
     }
 
     return () => { isMounted = false; };
-  }, [strokes, currentStroke]);
+  }, [strokes, currentStroke, targetDate]);
+
+  const handleDateChange = (newDate: Date) => {
+    const oldDateStr = format(targetDate, 'yyyy-MM-dd');
+    
+    // Save current canvas data URL to cache
+    if (canvasRef.current) {
+      sketchCache.current[oldDateStr] = canvasRef.current.toDataURL();
+    } else {
+      // Fallback to strokes if canvas isn't available
+      sketchCache.current[oldDateStr] = JSON.stringify(strokes);
+    }
+    
+    setTargetDate(newDate);
+  };
 
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent): Point | null => {
     if (!canvasRef.current) return null;
@@ -246,6 +291,7 @@ export const Stock: React.FC = () => {
       const result = await generateAndGrade({
         testType: 'Stock',
         guess: direction,
+        targetId: format(targetDate, 'yyyy-MM-dd'),
         targetDate: format(targetDate, 'yyyy-MM-dd'),
         telemetry: {
           timeToDecisionMs,
@@ -286,13 +332,13 @@ export const Stock: React.FC = () => {
         </p>
         
         <div className="flex items-center justify-center gap-4">
-          <button onClick={() => setTargetDate(getPrevTradingDay(targetDate))} className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors">
+          <button onClick={() => handleDateChange(getPrevTradingDay(targetDate))} className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors">
             <ChevronLeft className="w-6 h-6" />
           </button>
           <div className="text-xl font-bold text-white min-w-[200px]">
             {format(targetDate, 'EEEE, MMMM do')}
           </div>
-          <button onClick={() => setTargetDate(getNextTradingDay(targetDate))} className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors">
+          <button onClick={() => handleDateChange(getNextTradingDay(targetDate))} className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors">
             <ChevronRight className="w-6 h-6" />
           </button>
         </div>
@@ -345,7 +391,11 @@ export const Stock: React.FC = () => {
                   <button onClick={() => {
                     setStrokes([]);
                     setRedoStack([]);
-                  }} disabled={strokes.length === 0 || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
+                    if (canvasRef.current) {
+                      const ctx = canvasRef.current.getContext('2d');
+                      if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+                    }
+                  }} disabled={(strokes.length === 0 && !sketchCache.current[format(targetDate, 'yyyy-MM-dd')]) || isRevealed} className="p-1 hover:bg-neutral-200 rounded disabled:opacity-50">
                     <Trash2 className="w-5 h-5 text-red-600" />
                   </button>
                 </div>
