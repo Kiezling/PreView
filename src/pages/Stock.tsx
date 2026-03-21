@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { TrendingUp, RefreshCw, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Undo, Redo, Eraser, Trash2 } from 'lucide-react';
+import { TrendingUp, RefreshCw, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Undo, Redo, Eraser, Trash2, Loader2 } from 'lucide-react';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -49,6 +49,8 @@ export const Stock: React.FC = () => {
   const [selectedDirection, setSelectedDirection] = useState<'Higher' | 'Lower' | null>(null);
   const [actualDirection, setActualDirection] = useState<'Higher' | 'Lower' | 'Pending'>('Pending');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCheckingAttempt, setIsCheckingAttempt] = useState(true);
+  const [pendingDirection, setPendingDirection] = useState<'Higher' | 'Lower' | null>(null);
   const [images, setImages] = useState({ higher: '', lower: '' });
   const [priorClose, setPriorClose] = useState<number | null>(null);
   const [isLoadingClose, setIsLoadingClose] = useState(true);
@@ -80,6 +82,7 @@ export const Stock: React.FC = () => {
       const dateStr = format(targetDate, 'yyyy-MM-dd');
 
       if (isMounted) {
+        setIsCheckingAttempt(true);
         setIsLoadingClose(true);
         setPriorClose(null);
         setAttemptState('NoAttempt');
@@ -118,7 +121,10 @@ export const Stock: React.FC = () => {
         }
       }
 
-      if (!user) return;
+      if (!user) {
+        if (isMounted) setIsCheckingAttempt(false);
+        return;
+      }
 
       try {
         const q = query(
@@ -140,6 +146,10 @@ export const Stock: React.FC = () => {
         }
       } catch (error) {
         console.error("Error fetching attempt:", error);
+      } finally {
+        if (isMounted) {
+          setIsCheckingAttempt(false);
+        }
       }
     };
 
@@ -270,6 +280,7 @@ export const Stock: React.FC = () => {
     sequenceIndexRef.current += 1;
 
     setIsSubmitting(true);
+    setPendingDirection(direction);
     
     try {
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
@@ -298,6 +309,7 @@ export const Stock: React.FC = () => {
       console.error("Error saving attempt:", error);
     } finally {
       setIsSubmitting(false);
+      setPendingDirection(null);
     }
   };
 
@@ -331,7 +343,14 @@ export const Stock: React.FC = () => {
 
       <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 md:p-12 relative overflow-hidden">
         
-        {selectedDirection === null && (
+        {isCheckingAttempt ? (
+          <div className="flex flex-col items-center justify-center py-20">
+            <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
+            <p className="text-neutral-400 font-medium">Checking target status...</p>
+          </div>
+        ) : (
+          <>
+            {selectedDirection === null && (
           <>
             {/* Sketchpad */}
             <div className="bg-white rounded-xl overflow-hidden border border-neutral-300 mb-8 max-w-2xl mx-auto">
@@ -431,13 +450,16 @@ export const Stock: React.FC = () => {
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handleSelect('Higher')}
                     disabled={isSubmitting}
-                    className="flex flex-col items-center gap-4 p-6 rounded-2xl border-2 border-neutral-800 bg-neutral-900 hover:border-white transition-colors group"
+                    className={`flex flex-col items-center gap-4 p-6 rounded-2xl border-2 bg-neutral-900 transition-colors group
+                      ${pendingDirection === 'Higher' ? 'border-white ring-4 ring-white/50' : 'border-neutral-800 hover:border-white'}
+                      ${pendingDirection === 'Lower' ? 'opacity-50' : 'opacity-100'}
+                    `}
                   >
                     <div className="w-full aspect-video rounded-xl overflow-hidden border border-neutral-800">
                       {images.higher && <img src={images.higher} alt="Higher" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />}
                     </div>
                     <div className="flex items-center gap-2 text-xl font-bold text-white group-hover:text-white">
-                      <ArrowUpCircle className="w-6 h-6" />
+                      {pendingDirection === 'Higher' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowUpCircle className="w-6 h-6" />}
                       HIGHER
                     </div>
                   </motion.button>
@@ -447,13 +469,16 @@ export const Stock: React.FC = () => {
                     whileTap={{ scale: 0.98 }}
                     onClick={() => handleSelect('Lower')}
                     disabled={isSubmitting}
-                    className="flex flex-col items-center gap-4 p-6 rounded-2xl border-2 border-neutral-800 bg-neutral-900 hover:border-white transition-colors group"
+                    className={`flex flex-col items-center gap-4 p-6 rounded-2xl border-2 bg-neutral-900 transition-colors group
+                      ${pendingDirection === 'Lower' ? 'border-white ring-4 ring-white/50' : 'border-neutral-800 hover:border-white'}
+                      ${pendingDirection === 'Higher' ? 'opacity-50' : 'opacity-100'}
+                    `}
                   >
                     <div className="w-full aspect-video rounded-xl overflow-hidden border border-neutral-800">
                       {images.lower && <img src={images.lower} alt="Lower" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />}
                     </div>
                     <div className="flex items-center gap-2 text-xl font-bold text-white group-hover:text-white">
-                      <ArrowDownCircle className="w-6 h-6" />
+                      {pendingDirection === 'Lower' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowDownCircle className="w-6 h-6" />}
                       LOWER
                     </div>
                   </motion.button>
@@ -499,6 +524,8 @@ export const Stock: React.FC = () => {
               )}
             </div>
           </motion.div>
+        )}
+          </>
         )}
       </div>
     </motion.div>
