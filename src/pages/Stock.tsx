@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
-import { TrendingUp, RefreshCw, ArrowUpCircle, ArrowDownCircle, ChevronLeft, ChevronRight, Undo, Redo, Eraser, Trash2, Loader2 } from 'lucide-react';
+import { TrendingUp, RefreshCw, ArrowUpCircle, ArrowDownCircle, Undo, Redo, Eraser, Trash2, Loader2 } from 'lucide-react';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -28,21 +28,10 @@ const getNextTradingDay = (date: Date) => {
   return next;
 };
 
-const getPrevTradingDay = (date: Date) => {
-  let prev = subDays(date, 1);
-  if (prev.getDay() === 0) prev = subDays(prev, 2);
-  if (prev.getDay() === 6) prev = subDays(prev, 1);
-  return prev;
-};
-
 export const Stock: React.FC = () => {
   const { user } = useAuth();
   const [targetDate, setTargetDate] = useState<Date>(() => {
-    let nextDay = new Date();
-    if (isWeekend(nextDay)) {
-      nextDay = addDays(nextDay, nextDay.getDay() === 6 ? 2 : 1);
-    }
-    return nextDay;
+    return getNextTradingDay(new Date());
   });
   
   const [attemptState, setAttemptState] = useState<'NoAttempt' | 'Pending' | 'Resolved'>('NoAttempt');
@@ -186,17 +175,6 @@ export const Stock: React.FC = () => {
     return () => { isMounted = false; };
   }, [historyStep, history, targetDate]);
 
-  const handleDateChange = (newDate: Date) => {
-    const oldDateStr = format(targetDate, 'yyyy-MM-dd');
-    
-    // Save current canvas data URL to cache
-    if (canvasRef.current) {
-      sessionStorage.setItem('sketch_' + oldDateStr, canvasRef.current.toDataURL());
-    }
-    
-    setTargetDate(newDate);
-  };
-
   const getCoordinates = (e: React.MouseEvent | React.TouchEvent): Point | null => {
     if (!canvasRef.current) return null;
     const canvas = canvasRef.current;
@@ -329,15 +307,9 @@ export const Stock: React.FC = () => {
         </p>
         
         <div className="flex items-center justify-center gap-4">
-          <button onClick={() => handleDateChange(getPrevTradingDay(targetDate))} className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors">
-            <ChevronLeft className="w-6 h-6" />
-          </button>
           <div className="text-xl font-bold text-white min-w-[200px]">
             {format(targetDate, 'EEEE, MMMM do')}
           </div>
-          <button onClick={() => handleDateChange(getNextTradingDay(targetDate))} className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors">
-            <ChevronRight className="w-6 h-6" />
-          </button>
         </div>
       </header>
 
@@ -518,9 +490,9 @@ export const Stock: React.FC = () => {
 
             <div className="flex items-center gap-3 mb-8 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
               {selectedDirection === actualDirection ? (
-                <span className="text-3xl font-bold text-green-400 tracking-widest uppercase">Hit</span>
+                <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
               ) : (
-                <span className="text-3xl font-bold text-red-400 tracking-widest uppercase">Miss</span>
+                <span className="text-3xl font-bold text-neutral-300 tracking-widest uppercase">Miss</span>
               )}
             </div>
           </motion.div>

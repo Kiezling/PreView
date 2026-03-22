@@ -23,8 +23,8 @@ export const Layout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 text-xl font-bold tracking-tight text-yellow-500 hover:text-yellow-400 transition-colors">
-                <Brain className="w-6 h-6 text-yellow-500" />
+              <Link to="/" className="flex items-center gap-2 text-3xl font-bold tracking-tight text-white hover:text-neutral-200 transition-colors">
+                <Brain className="w-8 h-8 text-white" />
                 PreView
               </Link>
               
@@ -66,7 +66,7 @@ export const Layout: React.FC = () => {
                       <img src={publicProfile.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-neutral-700" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center border border-neutral-700">
-                        <Brain className="w-4 h-4 text-yellow-500" />
+                        <Brain className="w-4 h-4 text-white" />
                       </div>
                     )}
                     <span className="hidden sm:inline">{publicProfile?.displayName || user.displayName || 'Profile'}</span>
@@ -80,15 +80,7 @@ export const Layout: React.FC = () => {
                     <span className="hidden sm:inline">Logout</span>
                   </button>
                 </>
-              ) : (
-                <button
-                  onClick={login}
-                  className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium bg-white hover:bg-neutral-200 text-black transition-colors"
-                >
-                  <LogIn className="w-4 h-4" />
-                  Login to Start
-                </button>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -118,10 +110,10 @@ export const Layout: React.FC = () => {
           <Outlet />
         ) : (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-            <Brain className="w-24 h-24 text-yellow-500/50 mb-6" />
+            <Brain className="w-24 h-24 text-white/50 mb-6" />
             <h1 className="text-4xl font-bold tracking-tight mb-4">Welcome to PreView</h1>
             <p className="text-xl text-neutral-400 max-w-2xl mb-8">
-              A platform for practicing and recording your remote viewing abilities across different modalities including Zener Cards, Color Targets, Astro-Tarot, and Stock Market predictions.
+              Practice remote viewing and record your attempts across different modes. See how you stack up against all other users and the leaderboard!
             </p>
             <button
               onClick={login}
