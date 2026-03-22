@@ -38,21 +38,21 @@ export const AstroTarot: React.FC = () => {
     setActualCard(null);
   };
 
-  const handleSelect = async (option: string) => {
+  const handleSelect = async (selectedOptionParam: string) => {
     if (selectedOption || isSubmitting || !user || !guessType) return;
     
     const timeToDecisionMs = Date.now() - startTimeRef.current;
     sequenceIndexRef.current += 1;
 
     setIsSubmitting(true);
-    setSelectedOption(option);
+    setSelectedOption(selectedOptionParam);
     
     try {
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
       const result = await generateAndGrade({
         testType: 'AstroTarot',
         guessType,
-        guess: option,
+        guess: selectedOptionParam,
         targetId,
         telemetry: {
           timeToDecisionMs,

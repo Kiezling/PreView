@@ -39,94 +39,98 @@ export const Home: React.FC = () => {
     if (!user) return;
     let isMounted = true;
 
+    const fetchPersonalStats = async (uid: string) => {
+      const modes = [
+        { key: 'zener', collection: 'zenerAttempts' },
+        { key: 'astroTarot', collection: 'astroTarotAttempts' },
+        { key: 'stock', collection: 'stockAttempts' },
+        { key: 'standardDeck', collection: 'standardDeckAttempts' },
+        { key: 'colorTarget', collection: 'colorAttempts' },
+      ];
+
+      const pStats: Record<string, any> = {
+        zener: { total: 0, success: 0 },
+        astroTarot: { total: 0, success: 0 },
+        stock: { total: 0, success: 0 },
+        standardDeck: { 
+          total: 0, success: 0,
+          subStats: {
+            color: { total: 0, success: 0 },
+            suit: { total: 0, success: 0 },
+            value: { total: 0, success: 0 }
+          }
+        },
+        colorTarget: { total: 0, success: 0 },
+      };
+
+      for (const mode of modes) {
+        const q = query(
+          collection(db, mode.collection),
+          where('userId', '==', uid)
+        );
+        const snapshot = await getDocs(q);
+
+        snapshot.forEach(doc => {
+          const data = doc.data();
+          const isSuccess = data.isSuccess === true;
+
+          pStats[mode.key].total++;
+          if (isSuccess) pStats[mode.key].success++;
+
+          if (mode.key === 'standardDeck' && data.guessType && pStats.standardDeck.subStats[data.guessType]) {
+            pStats.standardDeck.subStats[data.guessType].total++;
+            if (isSuccess) pStats.standardDeck.subStats[data.guessType].success++;
+          }
+        });
+      }
+      return pStats;
+    };
+
     const fetchAllStats = async () => {
       try {
-        const modes = [
-          { key: 'zener', collection: 'zenerAttempts' },
-          { key: 'astroTarot', collection: 'astroTarotAttempts' },
-          { key: 'stock', collection: 'stockAttempts' },
-          { key: 'standardDeck', collection: 'standardDeckAttempts' },
-          { key: 'colorTarget', collection: 'colorAttempts' },
-        ];
+        const [personalData, globalStatsResult] = await Promise.all([
+          fetchPersonalStats(user.uid),
+          httpsCallable(functions, 'getGlobalStats')()
+        ]);
 
-        const newStats: Record<string, ModeStats> = {
-          zener: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-          astroTarot: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-          stock: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-          standardDeck: { 
-            user: { total: 0, success: 0 }, 
-            global: { total: 0, success: 0 },
-            subStats: {
-              color: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-              suit: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-              value: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } }
-            }
-          },
-          colorTarget: { user: { total: 0, success: 0 }, global: { total: 0, success: 0 } },
-        };
-
-        // Fetch personal stats securely
-        for (const mode of modes) {
-          const q = query(
-            collection(db, mode.collection),
-            where('userId', '==', user.uid)
-          );
-          const snapshot = await getDocs(q);
-
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            const isSuccess = data.isSuccess === true;
-
-            newStats[mode.key].user.total++;
-            if (isSuccess) newStats[mode.key].user.success++;
-
-            // Sub-stats for standard deck
-            if (mode.key === 'standardDeck' && data.guessType && newStats.standardDeck.subStats) {
-              const guessType = data.guessType as 'color' | 'suit' | 'value';
-              if (newStats.standardDeck.subStats[guessType]) {
-                newStats.standardDeck.subStats[guessType].user.total++;
-                if (isSuccess) newStats.standardDeck.subStats[guessType].user.success++;
-              }
-            }
-          });
-        }
-
-        // Fetch global stats via Cloud Function
-        const getGlobalStats = httpsCallable(functions, 'getGlobalStats');
-        const globalStatsResult = await getGlobalStats();
         const globalData = globalStatsResult.data as any;
 
-        if (globalData) {
-          if (globalData.zenerAttempts) {
-            newStats.zener.global.total = globalData.zenerAttempts.total || 0;
-            newStats.zener.global.success = globalData.zenerAttempts.hits || 0;
-          }
-          if (globalData.astroTarotAttempts) {
-            newStats.astroTarot.global.total = globalData.astroTarotAttempts.total || 0;
-            newStats.astroTarot.global.success = globalData.astroTarotAttempts.hits || 0;
-          }
-          if (globalData.stockAttempts) {
-            newStats.stock.global.total = globalData.stockAttempts.total || 0;
-            newStats.stock.global.success = globalData.stockAttempts.hits || 0;
-          }
-          if (globalData.colorAttempts) {
-            newStats.colorTarget.global.total = globalData.colorAttempts.total || 0;
-            newStats.colorTarget.global.success = globalData.colorAttempts.hits || 0;
-          }
-          if (globalData.standardDeckAttempts) {
-            newStats.standardDeck.global.total = globalData.standardDeckAttempts.total || 0;
-            newStats.standardDeck.global.success = globalData.standardDeckAttempts.hits || 0;
-            
-            if (globalData.standardDeckAttempts.subStats && newStats.standardDeck.subStats) {
-              ['color', 'suit', 'value'].forEach(type => {
-                if (globalData.standardDeckAttempts.subStats[type]) {
-                  newStats.standardDeck.subStats![type].global.total = globalData.standardDeckAttempts.subStats[type].total || 0;
-                  newStats.standardDeck.subStats![type].global.success = globalData.standardDeckAttempts.subStats[type].hits || 0;
-                }
-              });
+        const newStats: Record<string, ModeStats> = {
+          zener: { 
+            user: personalData.zener, 
+            global: { total: globalData.zenerAttempts?.total || 0, success: globalData.zenerAttempts?.hits || 0 } 
+          },
+          astroTarot: { 
+            user: personalData.astroTarot, 
+            global: { total: globalData.astroTarotAttempts?.total || 0, success: globalData.astroTarotAttempts?.hits || 0 } 
+          },
+          stock: { 
+            user: personalData.stock, 
+            global: { total: globalData.stockAttempts?.total || 0, success: globalData.stockAttempts?.hits || 0 } 
+          },
+          standardDeck: { 
+            user: { total: personalData.standardDeck.total, success: personalData.standardDeck.success }, 
+            global: { total: globalData.standardDeckAttempts?.total || 0, success: globalData.standardDeckAttempts?.hits || 0 },
+            subStats: {
+              color: { 
+                user: personalData.standardDeck.subStats.color, 
+                global: { total: globalData.standardDeckAttempts?.subStats?.color?.total || 0, success: globalData.standardDeckAttempts?.subStats?.color?.hits || 0 } 
+              },
+              suit: { 
+                user: personalData.standardDeck.subStats.suit, 
+                global: { total: globalData.standardDeckAttempts?.subStats?.suit?.total || 0, success: globalData.standardDeckAttempts?.subStats?.suit?.hits || 0 } 
+              },
+              value: { 
+                user: personalData.standardDeck.subStats.value, 
+                global: { total: globalData.standardDeckAttempts?.subStats?.value?.total || 0, success: globalData.standardDeckAttempts?.subStats?.value?.hits || 0 } 
+              }
             }
-          }
-        }
+          },
+          colorTarget: { 
+            user: personalData.colorTarget, 
+            global: { total: globalData.colorAttempts?.total || 0, success: globalData.colorAttempts?.hits || 0 } 
+          },
+        };
 
         if (isMounted) {
           setStats(newStats);
