@@ -1,7 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Star, LogOut, User as UserIcon, LogIn, LayoutDashboard, Layers, TrendingUp, Palette, Spade, Brain, XCircle, Headphones } from 'lucide-react';
+import { Star, LogOut, User as UserIcon, LogIn, LayoutDashboard, Layers, TrendingUp, Palette, Spade, Brain, XCircle, Headphones, BatteryMedium } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
@@ -9,12 +9,18 @@ import { functions } from '../firebase';
 export const Layout: React.FC = () => {
   const { user, publicProfile, login, logout, authError, clearAuthError, loading } = useAuth();
   const location = useLocation();
+  const [stamina, setStamina] = useState<number | null>(null);
+  const [regenTime, setRegenTime] = useState<number | null>(null);
 
   useEffect(() => {
     if (user) {
       httpsCallable(functions, 'generateAndGradeTarget')({ ping: true }).catch(() => {});
+      httpsCallable(functions, 'getStaminaStatus')().then(res => {
+        setStamina((res.data as any).currentStamina);
+        setRegenTime((res.data as any).nextRegenInMs);
+      }).catch(() => {});
     }
-  }, [user]);
+  }, [location.pathname, user]);
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -66,6 +72,12 @@ export const Layout: React.FC = () => {
                 <div className="w-24 h-8 animate-pulse bg-neutral-800 rounded-md"></div>
               ) : user ? (
                 <>
+                  {stamina !== null && (
+                    <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-1">
+                      <BatteryMedium className={cn("w-4 h-4", stamina === 3 ? "text-green-500" : stamina > 0 ? "text-yellow-500" : "text-red-500")} />
+                      <span className="text-xs font-bold text-white">{stamina} / 3</span>
+                    </div>
+                  )}
                   <Link 
                     to="/profile" 
                     className="flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-white transition-colors"

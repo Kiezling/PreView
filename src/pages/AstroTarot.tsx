@@ -4,7 +4,7 @@ import { Layers, RefreshCw, CheckCircle2, XCircle, ArrowLeft } from 'lucide-reac
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
-import { generateTargetId, getDeviceType } from '../lib/utils';
+import { generateTargetId, getDeviceType, cn } from '../lib/utils';
 
 const CATEGORIES = {
   Energy: ['Positive', 'Negative'],
@@ -62,6 +62,9 @@ export const AstroTarot: React.FC = () => {
       setIsSuccess(hit);
     } catch (error) {
       console.error("Error saving attempt:", error);
+      if (error instanceof Error && error.message.includes("Focus Stamina depleted")) {
+        alert("Focus Exhausted. You must wait for your stamina to recharge.");
+      }
       setGuess(null);
     } finally {
       setIsSubmitting(false);
@@ -145,15 +148,18 @@ export const AstroTarot: React.FC = () => {
             </div>
 
             {!guess ? (
-              <div className="flex flex-wrap justify-center gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                 {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
                   <button
                     key={option}
                     onClick={() => handleSelectOption(option)}
                     disabled={isSubmitting}
-                    className="px-8 py-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white font-semibold hover:bg-neutral-700 transition-colors text-lg min-w-[120px]"
+                    className={cn(
+                      "p-6 rounded-xl border border-neutral-800 bg-neutral-900 transition-colors flex flex-col items-center justify-center gap-2 text-white",
+                      isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-800"
+                    )}
                   >
-                    {option}
+                    <span className="text-lg font-bold">{option}</span>
                   </button>
                 ))}
               </div>
