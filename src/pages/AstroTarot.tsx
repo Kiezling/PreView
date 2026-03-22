@@ -1,26 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Layers, RefreshCw, ArrowLeft } from 'lucide-react';
+import { Layers, RefreshCw, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
 import { generateTargetId, getDeviceType } from '../lib/utils';
 
 const CATEGORIES = {
-  energy: ['Positive', 'Negative'],
-  element: ['Hot', 'Cold', 'Heavy', 'Sharp'],
-  archetype: ['Major', 'Minor'],
+  Energy: ['Positive', 'Negative'],
+  Element: ['Hot', 'Cold', 'Heavy', 'Sharp'],
+  Archetype: ['Major', 'Minor'],
 };
-
-type GuessType = 'energy' | 'element' | 'archetype';
 
 export const AstroTarot: React.FC = () => {
   const { user } = useAuth();
-  const [guessType, setGuessType] = useState<GuessType | null>(null);
-  const [targetId, setTargetId] = useState('');
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [actualAttributes, setActualAttributes] = useState<Record<string, string> | null>(null);
+  const [targetId, setTargetId] = useState(() => generateTargetId());
+  
+  const [guessType, setGuessType] = useState<string | null>(null);
+  const [guess, setGuess] = useState<string | null>(null);
+  
+  const [actualAttribute, setActualAttribute] = useState<string | null>(null);
   const [actualCard, setActualCard] = useState<{name: string, url: string} | null>(null);
+  const [isSuccess, setIsSuccess] = useState<boolean | null>(null);
+  
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const startTimeRef = useRef<number>(Date.now());
@@ -30,29 +32,21 @@ export const AstroTarot: React.FC = () => {
     startTimeRef.current = Date.now();
   }, [targetId]);
 
-  const handleStart = (type: GuessType) => {
-    setGuessType(type);
-    setTargetId(generateTargetId());
-    setSelectedOption(null);
-    setActualAttributes(null);
-    setActualCard(null);
-  };
-
-  const handleSelect = async (selectedOptionParam: string) => {
-    if (selectedOption || isSubmitting || !user || !guessType) return;
+  const handleSelectOption = async (selectedOption: string) => {
+    if (isSubmitting || !user || !guessType) return;
+    
+    setGuess(selectedOption);
+    setIsSubmitting(true);
     
     const timeToDecisionMs = Date.now() - startTimeRef.current;
     sequenceIndexRef.current += 1;
 
-    setIsSubmitting(true);
-    setSelectedOption(selectedOptionParam);
-    
     try {
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
       const result = await generateAndGrade({
         testType: 'AstroTarot',
-        guessType,
-        guess: selectedOptionParam,
+        guessType: guessType,
+        guess: selectedOption,
         targetId,
         telemetry: {
           timeToDecisionMs,
@@ -62,11 +56,13 @@ export const AstroTarot: React.FC = () => {
         }
       });
       
-      const { actualTarget } = result.data as any;
-      setActualAttributes(actualTarget.attributes);
+      const { actualTarget, isSuccess: hit } = result.data as any;
+      setActualAttribute(actualTarget.actualAttribute);
       setActualCard(actualTarget.card);
+      setIsSuccess(hit);
     } catch (error) {
       console.error("Error saving attempt:", error);
+      setGuess(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -74,21 +70,11 @@ export const AstroTarot: React.FC = () => {
 
   const reset = () => {
     setTargetId(generateTargetId());
-    setSelectedOption(null);
-    setActualAttributes(null);
-    setActualCard(null);
-  };
-
-  const changeMode = () => {
     setGuessType(null);
-    setSelectedOption(null);
-    setActualAttributes(null);
+    setGuess(null);
+    setActualAttribute(null);
     setActualCard(null);
-  };
-
-  const getOptions = () => {
-    if (guessType) return CATEGORIES[guessType];
-    return [];
+    setIsSuccess(null);
   };
 
   return (
@@ -103,106 +89,100 @@ export const AstroTarot: React.FC = () => {
         </div>
         <h1 className="text-4xl font-bold tracking-tight text-white mb-4">Astro-Tarot Deck</h1>
         <p className="text-neutral-400 text-lg">
-          Practice remote viewing with Astro-Tarot cards.
+          Focus on the target identifier. Select a category, then choose your impression.
         </p>
       </header>
 
       <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 md:p-12 relative overflow-hidden">
-        {!guessType ? (
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-white mb-8">Select your category</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <button
-                onClick={() => handleStart('energy')}
-                className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
-              >
-                <span className="text-2xl font-bold text-white">Energy</span>
-                <span className="text-neutral-400 text-sm">Positive or Negative</span>
-              </button>
-              <button
-                onClick={() => handleStart('element')}
-                className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
-              >
-                <span className="text-2xl font-bold text-white">Element</span>
-                <span className="text-neutral-400 text-sm">Hot, Cold, Heavy, Sharp</span>
-              </button>
-              <button
-                onClick={() => handleStart('archetype')}
-                className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
-              >
-                <span className="text-2xl font-bold text-white">Archetype</span>
-                <span className="text-neutral-400 text-sm">Major or Minor</span>
-              </button>
-            </div>
+        <div className="mb-12 text-center">
+          <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-3">Target Identifier</p>
+          <div className="inline-block bg-neutral-950 border border-neutral-800 rounded-xl px-8 py-4">
+            <span className="text-3xl font-mono text-white tracking-[0.2em]">{targetId}</span>
           </div>
-        ) : (
-          <>
-            <button 
-              onClick={changeMode}
-              className="absolute top-8 left-8 flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Change Mode
-            </button>
+        </div>
 
-            <div className="mb-12 text-center mt-8">
-              <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-3">Target Identifier</p>
-              <div className="inline-block bg-neutral-950 border border-neutral-800 rounded-xl px-8 py-4">
-                <span className="text-3xl font-mono text-white tracking-[0.2em]">{targetId}</span>
-              </div>
-            </div>
-
-            {!selectedOption ? (
-              <div className="flex flex-wrap justify-center gap-4">
-                {getOptions().map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => handleSelect(option)}
-                    disabled={isSubmitting}
-                    className="px-8 py-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white font-semibold hover:bg-neutral-700 transition-colors text-lg min-w-[120px]"
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="flex flex-col items-center"
-              >
-                <div className="flex flex-col items-center justify-center mb-10 w-full">
-                  <p className="text-xl text-neutral-400 mb-6 font-medium">The Actual Target</p>
+        <div className="flex justify-center">
+          {!actualCard ? (
+            <div className="w-full max-w-lg">
+              {!guessType ? (
+                <div className="space-y-4">
+                  <h3 className="text-xl font-medium text-white mb-6 text-center">Select Category</h3>
+                  {Object.keys(CATEGORIES).map(category => (
+                    <button
+                      key={category}
+                      onClick={() => setGuessType(category)}
+                      className="w-full p-6 rounded-2xl border-2 border-neutral-800 bg-neutral-900 text-white font-semibold text-lg hover:border-white transition-colors"
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="flex items-center mb-6">
+                    <button 
+                      onClick={() => setGuessType(null)}
+                      disabled={isSubmitting}
+                      className="p-2 rounded-lg hover:bg-neutral-800 text-neutral-400 transition-colors disabled:opacity-50"
+                    >
+                      <ArrowLeft className="w-6 h-6" />
+                    </button>
+                    <h3 className="text-xl font-medium text-white flex-1 text-center pr-10">Select {guessType}</h3>
+                  </div>
                   
-                  {actualCard && (
-                    <div className="w-full max-w-md aspect-[3/4] rounded-3xl overflow-hidden relative mb-6 bg-black">
-                      <img src={actualCard.url} alt={actualCard.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                    </div>
-                  )}
-                  {actualCard && (
-                    <h4 className="text-white font-bold text-xl mb-4">{actualCard.name}</h4>
-                  )}
+                  <div className="grid grid-cols-2 gap-4">
+                    {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
+                      <button
+                        key={option}
+                        onClick={() => handleSelectOption(option)}
+                        disabled={isSubmitting}
+                        className={`p-6 rounded-2xl border-2 transition-colors text-lg font-semibold
+                          ${guess === option ? 'border-white bg-white/10 text-white' : 'border-neutral-800 bg-neutral-900 text-neutral-300 hover:border-neutral-500 hover:text-white'}
+                          ${isSubmitting && guess !== option ? 'opacity-50' : 'opacity-100'}
+                        `}
+                      >
+                        {option}
+                      </button>
+                    ))}
+                  </div>
                 </div>
+              )}
+            </div>
+          ) : (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="flex flex-col items-center w-full"
+            >
+              <div className="flex items-center gap-3 mb-8 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
+                {isSuccess ? (
+                  <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
+                ) : (
+                  <span className="text-3xl font-bold text-neutral-400 tracking-widest uppercase">Miss</span>
+                )}
+              </div>
 
-                <div className="flex items-center gap-4 mb-10 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
-                  {actualAttributes && selectedOption === actualAttributes[guessType === 'energy' ? 'valence' : guessType] ? (
-                    <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
-                  ) : (
-                    <span className="text-3xl font-bold text-white tracking-widest uppercase">Miss</span>
-                  )}
-                </div>
+              <div className="w-full max-w-sm aspect-[3/4] rounded-3xl overflow-hidden relative mb-6 bg-black border border-neutral-800">
+                <img src={actualCard.url} alt={actualCard.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+              </div>
+              
+              <div className="text-center mb-10">
+                <h4 className="text-white font-bold text-2xl">{actualCard.name}</h4>
+                <p className="text-neutral-500 mt-2 font-medium text-lg uppercase tracking-wider">
+                  {guessType}: {actualAttribute}
+                </p>
+              </div>
 
-                <button
-                  onClick={reset}
-                  className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold hover:bg-neutral-200 transition-colors text-lg"
-                >
-                  <RefreshCw className="w-6 h-6" />
-                  Try Again
-                </button>
-              </motion.div>
-            )}
-          </>
-        )}
+              <button
+                onClick={reset}
+                className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold hover:bg-neutral-200 transition-colors text-lg"
+              >
+                <RefreshCw className="w-6 h-6" />
+                Next Target
+              </button>
+            </motion.div>
+          )}
+        </div>
       </div>
     </motion.div>
   );
