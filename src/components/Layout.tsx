@@ -1,12 +1,20 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { Star, LogOut, User as UserIcon, LogIn, LayoutDashboard, Layers, TrendingUp, Palette, Spade, Brain, XCircle, Headphones } from 'lucide-react';
 import { cn } from '../lib/utils';
+import { httpsCallable } from 'firebase/functions';
+import { functions } from '../firebase';
 
 export const Layout: React.FC = () => {
   const { user, publicProfile, login, logout, authError, clearAuthError, loading } = useAuth();
   const location = useLocation();
+
+  useEffect(() => {
+    if (user) {
+      httpsCallable(functions, 'generateAndGradeTarget')({ ping: true }).catch(() => {});
+    }
+  }, [user]);
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },

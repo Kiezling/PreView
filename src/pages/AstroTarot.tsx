@@ -94,95 +94,114 @@ export const AstroTarot: React.FC = () => {
       </header>
 
       <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 md:p-12 relative overflow-hidden">
-        <div className="mb-12 text-center">
-          <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-3">Target Identifier</p>
-          <div className="inline-block bg-neutral-950 border border-neutral-800 rounded-xl px-8 py-4">
-            <span className="text-3xl font-mono text-white tracking-[0.2em]">{targetId}</span>
-          </div>
-        </div>
-
-        <div className="flex justify-center">
-          {!actualCard ? (
-            <div className="w-full max-w-lg">
-              {!guessType ? (
-                <div className="space-y-4">
-                  <h3 className="text-xl font-medium text-white mb-6 text-center">Select Category</h3>
-                  {Object.keys(CATEGORIES).map(category => (
-                    <button
-                      key={category}
-                      onClick={() => setGuessType(category)}
-                      className="w-full p-6 rounded-2xl border-2 border-neutral-800 bg-neutral-900 text-white font-semibold text-lg hover:border-white transition-colors"
-                    >
-                      {category}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  <div className="flex items-center mb-6">
-                    <button 
-                      onClick={() => setGuessType(null)}
-                      disabled={isSubmitting}
-                      className="p-2 rounded-lg hover:bg-neutral-800 text-neutral-400 transition-colors disabled:opacity-50"
-                    >
-                      <ArrowLeft className="w-6 h-6" />
-                    </button>
-                    <h3 className="text-xl font-medium text-white flex-1 text-center pr-10">Select {guessType}</h3>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
-                      <button
-                        key={option}
-                        onClick={() => handleSelectOption(option)}
-                        disabled={isSubmitting}
-                        className={`p-6 rounded-2xl border-2 transition-colors text-lg font-semibold
-                          ${guess === option ? 'border-white bg-white/10 text-white' : 'border-neutral-800 bg-neutral-900 text-neutral-300 hover:border-neutral-500 hover:text-white'}
-                          ${isSubmitting && guess !== option ? 'opacity-50' : 'opacity-100'}
-                        `}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          ) : (
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="flex flex-col items-center w-full"
-            >
-              <div className="flex items-center gap-3 mb-8 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
-                {isSuccess ? (
-                  <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
-                ) : (
-                  <span className="text-3xl font-bold text-neutral-400 tracking-widest uppercase">Miss</span>
-                )}
-              </div>
-
-              <div className="w-full max-w-sm aspect-[3/4] rounded-3xl overflow-hidden relative mb-6 bg-black border border-neutral-800">
-                <img src={actualCard.url} alt={actualCard.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-              </div>
-              
-              <div className="text-center mb-10">
-                <h4 className="text-white font-bold text-2xl">{actualCard.name}</h4>
-                <p className="text-neutral-500 mt-2 font-medium text-lg uppercase tracking-wider">
-                  {guessType}: {actualAttribute}
-                </p>
-              </div>
-
+        {!guessType ? (
+          <div className="text-center">
+            <h2 className="text-2xl font-semibold text-white mb-8">Select your category</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <button
-                onClick={reset}
-                className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold hover:bg-neutral-200 transition-colors text-lg"
+                onClick={() => setGuessType('Energy')}
+                className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
               >
-                <RefreshCw className="w-6 h-6" />
-                Next Target
+                <span className="text-2xl font-bold text-white">Energy</span>
+                <span className="text-neutral-400 text-sm">POSITIVE / NEGATIVE</span>
               </button>
-            </motion.div>
-          )}
-        </div>
+              <button
+                onClick={() => setGuessType('Element')}
+                className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
+              >
+                <span className="text-2xl font-bold text-white">Element</span>
+                <span className="text-neutral-400 text-sm">HOT / COLD / HEAVY / SHARP</span>
+              </button>
+              <button
+                onClick={() => setGuessType('Archetype')}
+                className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
+              >
+                <span className="text-2xl font-bold text-white">Archetype</span>
+                <span className="text-neutral-400 text-sm">MAJOR / MINOR</span>
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <button 
+              onClick={() => {
+                setGuessType(null);
+                setGuess(null);
+                setActualAttribute(null);
+                setActualCard(null);
+                setIsSuccess(null);
+              }}
+              className="absolute top-8 left-8 flex items-center gap-2 text-neutral-400 hover:text-white transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Change Mode
+            </button>
+
+            <div className="mb-12 text-center mt-8">
+              <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-3">Target Identifier</p>
+              <div className="inline-block bg-neutral-950 border border-neutral-800 rounded-xl px-8 py-4">
+                <span className="text-3xl font-mono text-white tracking-[0.2em]">{targetId}</span>
+              </div>
+            </div>
+
+            {!guess ? (
+              <div className="flex flex-wrap justify-center gap-4">
+                {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
+                  <button
+                    key={option}
+                    onClick={() => handleSelectOption(option)}
+                    disabled={isSubmitting}
+                    className="px-8 py-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white font-semibold hover:bg-neutral-700 transition-colors text-lg min-w-[120px]"
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="flex flex-col items-center"
+              >
+                <div className="flex flex-col items-center justify-center mb-10 w-full">
+                  <p className="text-xl text-neutral-400 mb-6 font-medium">The Actual Target</p>
+                  
+                  {actualCard && (
+                    <div className="w-full max-w-sm aspect-[3/4] rounded-3xl overflow-hidden relative mb-6 bg-black border border-neutral-800">
+                      <img src={actualCard.url} alt={actualCard.name} className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                    </div>
+                  )}
+                  {actualCard && (
+                    <div className="text-center">
+                      <h4 className="text-white font-bold text-2xl">{actualCard.name}</h4>
+                      <p className="text-neutral-500 mt-2 font-medium text-lg uppercase tracking-wider">
+                        {guessType}: {actualAttribute}
+                      </p>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-4 mb-10 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
+                  {isSuccess === true ? (
+                    <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
+                  ) : isSuccess === false ? (
+                    <span className="text-3xl font-bold text-white tracking-widest uppercase">Miss</span>
+                  ) : (
+                    <span className="text-3xl font-bold text-neutral-500 tracking-widest uppercase">...</span>
+                  )}
+                </div>
+
+                <button
+                  onClick={reset}
+                  className="flex items-center gap-2 px-8 py-4 rounded-xl bg-white text-black font-semibold hover:bg-neutral-200 transition-colors text-lg"
+                >
+                  <RefreshCw className="w-6 h-6" />
+                  Try Again
+                </button>
+              </motion.div>
+            )}
+          </>
+        )}
       </div>
     </motion.div>
   );

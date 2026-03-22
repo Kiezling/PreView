@@ -37,6 +37,10 @@ const TAROT_CARDS = [
   { name: "Ace of Pentacles", url: "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pents01.jpg", archetype: "Minor", valence: "Positive", element: "Heavy" }
 ];
 
+export const preWarmPing = functions.https.onCall(async () => {
+  return { status: 'ok', timestamp: new Date().toISOString() };
+});
+
 export const getMarketData = functions.https.onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
