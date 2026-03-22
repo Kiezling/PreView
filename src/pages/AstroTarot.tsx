@@ -103,21 +103,21 @@ export const AstroTarot: React.FC = () => {
                 className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
               >
                 <span className="text-2xl font-bold text-white">Energy</span>
-                <span className="text-neutral-400 text-sm">POSITIVE / NEGATIVE</span>
+                <span className="text-neutral-400 text-sm">Positive or Negative</span>
               </button>
               <button
                 onClick={() => setGuessType('Element')}
                 className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
               >
                 <span className="text-2xl font-bold text-white">Element</span>
-                <span className="text-neutral-400 text-sm">HOT / COLD / HEAVY / SHARP</span>
+                <span className="text-neutral-400 text-sm">Hot, Cold, Heavy, Sharp</span>
               </button>
               <button
                 onClick={() => setGuessType('Archetype')}
                 className="p-8 rounded-2xl border border-neutral-800 bg-neutral-950 hover:bg-neutral-800 transition-colors flex flex-col items-center gap-4"
               >
                 <span className="text-2xl font-bold text-white">Archetype</span>
-                <span className="text-neutral-400 text-sm">MAJOR / MINOR</span>
+                <span className="text-neutral-400 text-sm">Major or Minor</span>
               </button>
             </div>
           </div>
@@ -174,9 +174,7 @@ export const AstroTarot: React.FC = () => {
                   {actualCard && (
                     <div className="text-center">
                       <h4 className="text-white font-bold text-2xl">{actualCard.name}</h4>
-                      <p className="text-neutral-500 mt-2 font-medium text-lg uppercase tracking-wider">
-                        {guessType}: {actualAttribute}
-                      </p>
+                      <p className="text-lg text-neutral-500 font-medium mt-1">{guessType}: {actualAttribute}</p>
                     </div>
                   )}
                 </div>
