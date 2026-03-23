@@ -7,7 +7,7 @@ import { useAuth } from '../components/AuthContext';
 import { format } from 'date-fns';
 
 export const Profile: React.FC = () => {
-  const { user, publicProfile, refreshPublicProfile } = useAuth();
+  const { user, publicProfile, refreshPublicProfile, setOptimisticProfile } = useAuth();
   
   const [publicName, setPublicName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
@@ -66,15 +66,16 @@ export const Profile: React.FC = () => {
     if (!user) return;
     const newShowAvatar = !localShowAvatar;
     setLocalShowAvatar(newShowAvatar);
+    setOptimisticProfile({ showAvatar: newShowAvatar, photoURL: newShowAvatar ? user.photoURL : null });
     try {
       await setDoc(doc(db, 'users_public', user.uid), { 
         showAvatar: newShowAvatar,
         photoURL: newShowAvatar ? user.photoURL : null
       }, { merge: true });
-      await refreshPublicProfile();
     } catch (error) {
       console.error("Error updating avatar preference:", error);
       setLocalShowAvatar(!newShowAvatar);
+      setOptimisticProfile({ showAvatar: !newShowAvatar, photoURL: !newShowAvatar ? user.photoURL : null });
     }
   };
 
@@ -108,7 +109,14 @@ export const Profile: React.FC = () => {
   }, [user]);
 
   const getChronobiologyData = () => {
-    const filtered = filterMode === 'All' ? attempts : attempts.filter(a => a.mode.toLowerCase().includes(filterMode.toLowerCase()));
+    const filtered = attempts.filter(a => {
+      if (filterMode === 'All') return true;
+      if (filterMode === 'Zener') return a.testType === 'Zener';
+      if (filterMode === 'Color') return a.testType === 'Color';
+      if (filterMode.startsWith('Deck:')) return a.testType === 'StandardDeck' && a.guessType?.toLowerCase() === filterMode.split(': ')[1].toLowerCase();
+      if (filterMode.startsWith('Tarot:')) return a.testType === 'AstroTarot' && a.guessType === filterMode.split(': ')[1];
+      return true;
+    });
     
     const buckets = [
       { label: '00-03', total: 0, hits: 0 },
@@ -148,7 +156,7 @@ export const Profile: React.FC = () => {
       <header className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-12 bg-neutral-900/50 p-8 rounded-3xl border border-neutral-800 relative">
         <div className="flex flex-col items-center gap-4">
           {localShowAvatar && user.photoURL ? (
-            <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full border-4 border-neutral-800" referrerPolicy="no-referrer" />
+            <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full border-4 border-neutral-800 object-cover flex-shrink-0" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-neutral-700">
               <UserIcon className="w-10 h-10 text-neutral-500" />
@@ -210,46 +218,19 @@ export const Profile: React.FC = () => {
             )}
           </div>
           <p className="text-sm text-neutral-500 mt-2">
-            Set the name that other users might see
+            Your username will be public.
           </p>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Recent Attempt Ledger */}
-        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
-          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-            <Activity className="w-5 h-5" />
-            Recent Attempt Ledger
-          </h2>
-          <div className="max-h-64 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-            {recentAttempts.length > 0 ? (
-              recentAttempts.map((attempt) => (
-                <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-sm">
-                  <div className="flex items-center gap-3 text-neutral-400 mb-2 sm:mb-0">
-                    <span className="font-mono text-xs">{format(new Date(attempt.timestamp), 'MM/dd HH:mm')}</span>
-                    <span className="uppercase tracking-wider text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-800 text-white">{attempt.mode}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-neutral-300">
-                      {attempt.guess || attempt.selectedDirection || attempt.selectedColor?.name || 'N/A'} 
-                      <span className="text-neutral-600 mx-2">→</span> 
-                      {attempt.actualTarget || attempt.actualDirection || attempt.actualColor?.name || 'N/A'}
-                    </span>
-                    <span className={`font-bold w-12 text-right ${attempt.isSuccess ? 'text-white' : 'text-neutral-500'}`}>
-                      {attempt.isSuccess ? 'HIT' : 'MISS'}
-                    </span>
-                  </div>
-                </div>
-              ))
-            ) : (
-              <p className="text-neutral-500 text-center py-8">No recent attempts found.</p>
-            )}
-          </div>
-        </div>
+      <div className="w-full bg-neutral-900/50 p-8 rounded-3xl border border-neutral-800 mb-8">
+        <h2 className="text-2xl font-semibold text-white mb-6">Personal Accuracy by Mode</h2>
+        <p className="text-neutral-400">Processing historical accuracy data...</p>
+      </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
         {/* Temporal Performance (Chronobiology) */}
-        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
+        <div className="w-full bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
           <div className="flex items-center justify-between mb-8">
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
               <Calendar className="w-5 h-5" />
@@ -261,10 +242,14 @@ export const Profile: React.FC = () => {
               className="bg-neutral-950 border border-neutral-800 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-white"
             >
               <option value="All">All Modes</option>
-              <option value="zener">Zener</option>
-              <option value="color">Color</option>
-              <option value="astroTarot">Tarot</option>
-              <option value="standardDeck">Deck</option>
+              <option value="Zener">Zener</option>
+              <option value="Color">Color</option>
+              <option value="Deck: Color">Deck: Color</option>
+              <option value="Deck: Suit">Deck: Suit</option>
+              <option value="Deck: Value">Deck: Value</option>
+              <option value="Tarot: Energy">Tarot: Energy</option>
+              <option value="Tarot: Element">Tarot: Element</option>
+              <option value="Tarot: Archetype">Tarot: Archetype</option>
             </select>
           </div>
           
@@ -288,14 +273,46 @@ export const Profile: React.FC = () => {
         </div>
 
         {/* Focus State Correlation */}
-        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 lg:col-span-2">
+        <div className="w-full bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
           <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
             <Brain className="w-5 h-5" />
             Focus State Correlation
           </h2>
-          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-8 text-center">
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-8 text-center h-full flex items-center justify-center">
             <p className="text-neutral-400 font-mono text-sm">Insufficient Data: Focus telemetry collection initiated.</p>
           </div>
+        </div>
+      </div>
+
+      {/* Recent Attempt Ledger */}
+      <div className="w-full bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
+        <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+          <Activity className="w-5 h-5" />
+          Recent Attempt Ledger
+        </h2>
+        <div className="pr-2 space-y-2">
+          {recentAttempts.length > 0 ? (
+            recentAttempts.map((attempt) => (
+              <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-sm">
+                <div className="flex items-center gap-3 text-neutral-400 mb-2 sm:mb-0">
+                  <span className="font-mono text-xs">{format(new Date(attempt.timestamp), 'MM/dd HH:mm')}</span>
+                  <span className="uppercase tracking-wider text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-800 text-white">{attempt.mode}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <span className="text-neutral-300">
+                    {attempt.guess || attempt.selectedDirection || attempt.selectedColor?.name || 'N/A'} 
+                    <span className="text-neutral-600 mx-2">→</span> 
+                    {attempt.actualTarget || attempt.actualDirection || attempt.actualColor?.name || 'N/A'}
+                  </span>
+                  <span className={`font-bold w-12 text-right ${attempt.isSuccess ? 'text-white' : 'text-neutral-500'}`}>
+                    {attempt.isSuccess ? 'HIT' : 'MISS'}
+                  </span>
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-neutral-500 text-center py-8">No recent attempts found.</p>
+          )}
         </div>
       </div>
     </motion.div>

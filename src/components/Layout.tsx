@@ -167,7 +167,7 @@ export const Layout: React.FC = () => {
                     className="flex items-center gap-2 text-sm font-medium text-neutral-400 hover:text-white transition-colors"
                   >
                     {publicProfile?.showAvatar && publicProfile?.photoURL ? (
-                      <img src={publicProfile.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-neutral-700" referrerPolicy="no-referrer" />
+                      <img src={publicProfile.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-neutral-700 object-cover flex-shrink-0" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center border border-neutral-700">
                         <UserIcon className="w-5 h-5 text-white" />

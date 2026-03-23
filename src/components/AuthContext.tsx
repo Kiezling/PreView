@@ -17,6 +17,7 @@ interface AuthContextType {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   refreshPublicProfile: () => Promise<void>;
+  setOptimisticProfile: (profile: Partial<PublicProfile>) => void;
   clearAuthError: () => void;
 }
 
@@ -28,6 +29,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   logout: async () => {},
   refreshPublicProfile: async () => {},
+  setOptimisticProfile: () => {},
   clearAuthError: () => {},
 });
 
@@ -38,6 +40,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [publicProfile, setPublicProfile] = useState<PublicProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+
+  const setOptimisticProfile = (updates: Partial<PublicProfile>) => {
+    setPublicProfile(prev => prev ? { ...prev, ...updates } : null);
+  };
 
   const fetchPublicProfile = async (uid: string) => {
     try {
@@ -140,7 +146,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearAuthError = () => setAuthError(null);
 
   return (
-    <AuthContext.Provider value={{ user, publicProfile, loading, authError, login, logout, refreshPublicProfile, clearAuthError }}>
+    <AuthContext.Provider value={{ user, publicProfile, loading, authError, login, logout, refreshPublicProfile, setOptimisticProfile, clearAuthError }}>
       {children}
     </AuthContext.Provider>
   );
