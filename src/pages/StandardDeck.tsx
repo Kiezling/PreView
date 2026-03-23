@@ -168,17 +168,20 @@ export const StandardDeck: React.FC = () => {
             </div>
 
             {!selectedOption ? (
-              <div className="flex flex-wrap justify-center gap-4">
-                {getOptions().map((option) => (
-                  <button
-                    key={option}
-                    onClick={() => handleSelect(option)}
-                    disabled={isSubmitting}
-                    className="px-8 py-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white font-semibold hover:bg-neutral-700 transition-colors text-lg min-w-[120px]"
-                  >
-                    {option}
-                  </button>
-                ))}
+              <div>
+                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
+                <div className="flex flex-wrap justify-center gap-4">
+                  {getOptions().map((option) => (
+                    <button
+                      key={option}
+                      onClick={() => handleSelect(option)}
+                      disabled={isSubmitting}
+                      className="px-8 py-4 rounded-xl border border-neutral-700 bg-neutral-800 text-white font-semibold hover:bg-neutral-700 transition-colors text-lg min-w-[120px]"
+                    >
+                      {option}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <motion.div 

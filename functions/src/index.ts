@@ -158,3 +158,143 @@ export const generateAndGradeTarget = functions.https.onCall(async (request) => 
   await db.collection(collectionName).add(record);
   return { actualTarget, isSuccess, axisResults: record.axisResults };
 });
+
+export const getGlobalStats = functions.https.onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  if (request.data && request.data.ping) {
+    return { status: 'pong', timestamp: new Date().toISOString() };
+  }
+
+  const db = admin.firestore();
+  
+  const getStats = async (collectionName: string) => {
+    const snapshot = await db.collection(collectionName).get();
+    let hits = 0;
+    snapshot.forEach(doc => {
+      if (doc.data().isSuccess) hits++;
+    });
+    return { total: snapshot.size, hits };
+  };
+
+  const [zenerAttempts, colorAttempts, stockAttempts, astroTarotAttempts] = await Promise.all([
+    getStats('zenerAttempts'),
+    getStats('colorAttempts'),
+    getStats('stockAttempts'),
+    getStats('astroTarotAttempts')
+  ]);
+
+  const standardDeckSnapshot = await db.collection('standardDeckAttempts').get();
+  let standardDeckHits = 0;
+  const subStats = {
+    color: { total: 0, hits: 0 },
+    suit: { total: 0, hits: 0 },
+    value: { total: 0, hits: 0 }
+  };
+  standardDeckSnapshot.forEach(doc => {
+    const data = doc.data();
+    if (data.isSuccess) standardDeckHits++;
+    if (data.guessType && subStats[data.guessType as keyof typeof subStats]) {
+      subStats[data.guessType as keyof typeof subStats].total++;
+      if (data.isSuccess) subStats[data.guessType as keyof typeof subStats].hits++;
+    }
+  });
+  const standardDeckAttempts = { total: standardDeckSnapshot.size, hits: standardDeckHits, subStats };
+
+  return {
+    zenerAttempts,
+    colorAttempts,
+    stockAttempts,
+    astroTarotAttempts,
+    standardDeckAttempts
+  };
+});
+
+export const purgeUserRecords = functions.https.onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const db = admin.firestore();
+  const callerDoc = await db.collection('users').doc(request.auth.uid).get();
+  if (callerDoc.data()?.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Must be admin');
+  }
+
+  const { targetUserId, moduleName } = request.data;
+  if (!targetUserId || !moduleName) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
+  }
+
+  const collectionMap: Record<string, string> = {
+    'Zener': 'zenerAttempts',
+    'Color': 'colorAttempts',
+    'Stock': 'stockAttempts',
+    'AstroTarot': 'astroTarotAttempts',
+    'StandardDeck': 'standardDeckAttempts'
+  };
+
+  const collectionName = collectionMap[moduleName];
+  if (!collectionName) {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid module name');
+  }
+
+  const snapshot = await db.collection(collectionName).where('userId', '==', targetUserId).get();
+  const batch = db.batch();
+  snapshot.docs.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+  await batch.commit();
+
+  return { success: true, deletedCount: snapshot.size };
+});
+
+export const adminManageStamina = functions.https.onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const db = admin.firestore();
+  const callerDoc = await db.collection('users').doc(request.auth.uid).get();
+  if (callerDoc.data()?.role !== 'admin') {
+    throw new functions.https.HttpsError('permission-denied', 'Must be admin');
+  }
+
+  const { targetUserId, action } = request.data;
+  if (!targetUserId || !action) {
+    throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
+  }
+
+  const userRef = db.collection('users').doc(targetUserId);
+  
+  if (action === 'refill') {
+    await userRef.update({ focusStamina: 100 });
+  } else if (action === 'deplete') {
+    await userRef.update({ focusStamina: 0 });
+  } else {
+    throw new functions.https.HttpsError('invalid-argument', 'Invalid action');
+  }
+
+  return { success: true };
+});
+
+export const getStaminaStatus = functions.https.onCall(async (request) => {
+  if (!request.auth) {
+    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  const db = admin.firestore();
+  const userDoc = await db.collection('users').doc(request.auth.uid).get();
+  
+  if (!userDoc.exists) {
+    return { focusStamina: 100, nextRefill: null };
+  }
+
+  const data = userDoc.data();
+  return {
+    focusStamina: data?.focusStamina ?? 100,
+    nextRefill: data?.nextRefill ?? null
+  };
+});

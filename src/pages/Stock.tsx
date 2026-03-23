@@ -420,6 +420,7 @@ export const Stock: React.FC = () => {
                 </div>
 
                 {/* Higher / Lower Buttons */}
+                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <motion.button
                     whileHover={{ scale: 1.02 }}

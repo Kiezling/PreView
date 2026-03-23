@@ -88,6 +88,12 @@ export const Home: React.FC = () => {
 
     const fetchAllStats = async () => {
       try {
+        const cachedStats = sessionStorage.getItem('preview_dashboard_stats');
+        if (cachedStats && isMounted) {
+          setStats(JSON.parse(cachedStats));
+          setLoading(false);
+        }
+
         const [personalData, globalStatsResult] = await Promise.all([
           fetchPersonalStats(user.uid),
           httpsCallable(functions, 'getGlobalStats')()
@@ -134,6 +140,7 @@ export const Home: React.FC = () => {
 
         if (isMounted) {
           setStats(newStats);
+          sessionStorage.setItem('preview_dashboard_stats', JSON.stringify(newStats));
         }
       } catch (error) {
         console.error("Error fetching stats:", error);

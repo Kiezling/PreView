@@ -68,11 +68,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        if (localStorage.getItem('profileVerified_' + currentUser.uid)) {
+        // Ensure users_public is fetched on initial load
+        const publicRef = doc(db, 'users_public', currentUser.uid);
+        const publicSnap = await getDoc(publicRef);
+        
+        if (publicSnap.exists()) {
+          const data = publicSnap.data();
           setPublicProfile({
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            showAvatar: true,
+            displayName: data.displayName || null,
+            photoURL: data.photoURL || null,
+            showAvatar: data.showAvatar !== false,
           });
         } else {
           // Ensure user profile exists in Firestore
@@ -88,30 +93,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
           
-          // Ensure public profile exists in Firestore
-          const publicRef = doc(db, 'users_public', currentUser.uid);
-          const publicSnap = await getDoc(publicRef);
-          if (!publicSnap.exists()) {
-            await setDoc(publicRef, {
-              uid: currentUser.uid,
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
-              showAvatar: true,
-            });
-            setPublicProfile({
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
-              showAvatar: true,
-            });
-          } else {
-            const data = publicSnap.data();
-            setPublicProfile({
-              displayName: data.displayName || null,
-              photoURL: data.photoURL || null,
-              showAvatar: data.showAvatar !== false,
-            });
-          }
-          localStorage.setItem('profileVerified_' + currentUser.uid, 'true');
+          await setDoc(publicRef, {
+            uid: currentUser.uid,
+            displayName: currentUser.displayName,
+            photoURL: currentUser.photoURL,
+            showAvatar: true,
+          });
+          setPublicProfile({
+            displayName: currentUser.displayName,
+            photoURL: currentUser.photoURL,
+            showAvatar: true,
+          });
         }
       } else {
         setPublicProfile(null);

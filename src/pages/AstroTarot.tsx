@@ -149,20 +149,23 @@ export const AstroTarot: React.FC = () => {
             </div>
 
             {!guess ? (
-              <div className="flex flex-wrap justify-center gap-4">
-                {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
-                  <button
-                    key={option}
-                    onClick={() => handleSelectOption(option)}
-                    disabled={isSubmitting}
-                    className={cn(
-                      "p-6 rounded-xl border border-neutral-800 bg-neutral-900 transition-colors flex flex-col items-center justify-center gap-2 text-white",
-                      isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-800"
-                    )}
-                  >
-                    <span className="text-lg font-bold">{option}</span>
-                  </button>
-                ))}
+              <div>
+                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
+                <div className="flex flex-wrap justify-center gap-4">
+                  {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
+                    <button
+                      key={option}
+                      onClick={() => handleSelectOption(option)}
+                      disabled={isSubmitting}
+                      className={cn(
+                        "p-6 rounded-xl border border-neutral-800 bg-neutral-900 transition-colors flex flex-col items-center justify-center gap-2 text-white",
+                        isSubmitting ? "opacity-50 cursor-not-allowed" : "hover:bg-neutral-800"
+                      )}
+                    >
+                      <span className="text-lg font-bold">{option}</span>
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               <motion.div 

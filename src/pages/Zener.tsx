@@ -125,19 +125,22 @@ export const Zener: React.FC = () => {
 
         {/* Card Selection */}
         {!selectedCard ? (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
-            {CARDS.map((card) => (
-              <motion.button
-                key={card}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => handleSelect(card)}
-                disabled={isSubmitting}
-                className="aspect-[3/4] rounded-xl border-2 border-neutral-700 bg-neutral-800 hover:border-white hover:bg-neutral-700 transition-colors flex items-center justify-center text-lg font-medium text-white shadow-lg"
-              >
-                {card}
-              </motion.button>
-            ))}
+          <div>
+            <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+              {CARDS.map((card) => (
+                <motion.button
+                  key={card}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => handleSelect(card)}
+                  disabled={isSubmitting}
+                  className="aspect-[3/4] rounded-xl border-2 border-neutral-700 bg-neutral-800 hover:border-white hover:bg-neutral-700 transition-colors flex items-center justify-center text-lg font-medium text-white shadow-lg"
+                >
+                  {card}
+                </motion.button>
+              ))}
+            </div>
           </div>
         ) : (
           <motion.div 
