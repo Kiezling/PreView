@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
-import { User as UserIcon, Calendar, Activity, Star, Layers, TrendingUp, Palette, Edit2, Check, X, Spade, Brain, ToggleLeft, ToggleRight } from 'lucide-react';
+import { User as UserIcon, Calendar, Activity, Star, Layers, TrendingUp, Palette, Edit2, Check, X, Spade, Brain, ToggleLeft, ToggleRight, Clock } from 'lucide-react';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../components/AuthContext';
@@ -13,15 +13,9 @@ export const Profile: React.FC = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
-  const [localShowAvatar, setLocalShowAvatar] = useState(publicProfile?.showAvatar ?? true);
+  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
   const [attempts, setAttempts] = useState<any[]>([]);
-  const [filterMode, setFilterMode] = useState<string>('All');
-
-  useEffect(() => {
-    if (publicProfile) {
-      setLocalShowAvatar(publicProfile.showAvatar ?? true);
-    }
-  }, [publicProfile]);
+  const [filterMode, setFilterMode] = useState<string>('Zener');
 
   useEffect(() => {
     if (!user) return;
@@ -63,19 +57,27 @@ export const Profile: React.FC = () => {
   };
 
   const toggleAvatar = async () => {
-    if (!user) return;
-    const newShowAvatar = !localShowAvatar;
-    setLocalShowAvatar(newShowAvatar);
-    setOptimisticProfile({ showAvatar: newShowAvatar, photoURL: newShowAvatar ? user.photoURL : null });
+    if (!user || !publicProfile) return;
+    const newShowAvatar = !publicProfile.showAvatar;
+    setIsSavingAvatar(true);
+    
+    // 1. Optimistic Update
+    setOptimisticProfile({ 
+      showAvatar: newShowAvatar, 
+      photoURL: newShowAvatar ? user.photoURL : null 
+    });
+    
+    // 2. Background DB Write
     try {
       await setDoc(doc(db, 'users_public', user.uid), { 
         showAvatar: newShowAvatar,
         photoURL: newShowAvatar ? user.photoURL : null
       }, { merge: true });
     } catch (error) {
-      console.error("Error updating avatar preference:", error);
-      setLocalShowAvatar(!newShowAvatar);
-      setOptimisticProfile({ showAvatar: !newShowAvatar, photoURL: !newShowAvatar ? user.photoURL : null });
+      console.error(error);
+      setOptimisticProfile({ showAvatar: !newShowAvatar }); // Rollback on fail
+    } finally {
+      setIsSavingAvatar(false);
     }
   };
 
@@ -110,9 +112,9 @@ export const Profile: React.FC = () => {
 
   const getChronobiologyData = () => {
     const filtered = attempts.filter(a => {
-      if (filterMode === 'All') return true;
       if (filterMode === 'Zener') return a.testType === 'Zener';
       if (filterMode === 'Color') return a.testType === 'Color';
+      if (filterMode === 'Stock') return a.testType === 'Stock';
       if (filterMode.startsWith('Deck:')) return a.testType === 'StandardDeck' && a.guessType?.toLowerCase() === filterMode.split(': ')[1].toLowerCase();
       if (filterMode.startsWith('Tarot:')) return a.testType === 'AstroTarot' && a.guessType === filterMode.split(': ')[1];
       return true;
@@ -145,6 +147,22 @@ export const Profile: React.FC = () => {
   const chronoData = getChronobiologyData();
   const recentAttempts = attempts.slice(0, 15);
 
+  const formatAttemptData = (a: any) => {
+    let guess = 'N/A', actual = 'N/A';
+    if (a.testType === 'Zener') { guess = a.selectedCard; actual = a.actualCard; }
+    else if (a.testType === 'Color') { guess = a.selectedColor; actual = a.actualColor; }
+    else if (a.testType === 'Stock') { guess = a.selectedDirection; actual = a.actualDirection; }
+    else if (a.testType === 'StandardDeck') { 
+      guess = a.selectedOption; 
+      actual = a.actualCard ? `${a.actualCard.value} of ${a.actualCard.suit}` : 'N/A'; 
+    }
+    else if (a.testType === 'AstroTarot') { 
+      guess = a.selectedAttributes ? Object.values(a.selectedAttributes)[0] as string : 'N/A'; 
+      actual = a.actualAttributes ? Object.values(a.actualAttributes)[0] as string : 'N/A'; 
+    }
+    return { guess: String(guess || 'N/A'), actual: String(actual || 'N/A') };
+  };
+
   if (!user) return null;
 
   return (
@@ -155,7 +173,7 @@ export const Profile: React.FC = () => {
     >
       <header className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-12 bg-neutral-900/50 p-8 rounded-3xl border border-neutral-800 relative">
         <div className="flex flex-col items-center gap-4">
-          {localShowAvatar && user.photoURL ? (
+          {publicProfile?.showAvatar && user.photoURL ? (
             <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full border-4 border-neutral-800 object-cover flex-shrink-0" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-neutral-700">
@@ -165,9 +183,10 @@ export const Profile: React.FC = () => {
           <div className="flex items-center gap-3">
             <button 
               onClick={toggleAvatar}
-              className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors px-1 outline-none ${localShowAvatar ? 'bg-white' : 'bg-neutral-700'}`}
+              disabled={isSavingAvatar}
+              className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors px-1 outline-none ${publicProfile?.showAvatar ? 'bg-white' : 'bg-neutral-700'}`}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full transition-transform ${localShowAvatar ? 'bg-black translate-x-6' : 'bg-white translate-x-0'}`} />
+              <span className={`inline-block h-4 w-4 transform rounded-full transition-transform ${publicProfile?.showAvatar ? 'bg-black translate-x-6' : 'bg-white translate-x-0'}`} />
             </button>
             <span className="text-sm text-neutral-400">Show Avatar</span>
           </div>
@@ -223,12 +242,7 @@ export const Profile: React.FC = () => {
         </div>
       </header>
 
-      <div className="w-full bg-neutral-900/50 p-8 rounded-3xl border border-neutral-800 mb-8">
-        <h2 className="text-2xl font-semibold text-white mb-6">Personal Accuracy by Mode</h2>
-        <p className="text-neutral-400">Processing historical accuracy data...</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+      <div className="flex flex-col gap-8 w-full mb-8">
         {/* Temporal Performance (Chronobiology) */}
         <div className="w-full bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
           <div className="flex items-center justify-between mb-8">
@@ -241,7 +255,6 @@ export const Profile: React.FC = () => {
               onChange={(e) => setFilterMode(e.target.value)}
               className="bg-neutral-950 border border-neutral-800 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-white"
             >
-              <option value="All">All Modes</option>
               <option value="Zener">Zener</option>
               <option value="Color">Color</option>
               <option value="Deck: Color">Deck: Color</option>
@@ -250,6 +263,7 @@ export const Profile: React.FC = () => {
               <option value="Tarot: Energy">Tarot: Energy</option>
               <option value="Tarot: Element">Tarot: Element</option>
               <option value="Tarot: Archetype">Tarot: Archetype</option>
+              <option value="Stock">Stock Strategy</option>
             </select>
           </div>
           
@@ -269,7 +283,7 @@ export const Profile: React.FC = () => {
               </div>
             ))}
           </div>
-          <p className="text-xs text-neutral-500 text-center mt-4">Accuracy by local hour (4-hour buckets)</p>
+          <p className="text-xs text-neutral-500 text-center mt-4">Accuracy by local hour (4-hour intervals)</p>
         </div>
 
         {/* Focus State Correlation */}
@@ -287,12 +301,14 @@ export const Profile: React.FC = () => {
       {/* Recent Attempt Ledger */}
       <div className="w-full bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
         <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
-          <Activity className="w-5 h-5" />
-          Recent Attempt Ledger
+          <Clock className="w-8 h-8 text-white" />
+          Recent Attempts
         </h2>
         <div className="pr-2 space-y-2">
           {recentAttempts.length > 0 ? (
-            recentAttempts.map((attempt) => (
+            recentAttempts.map((attempt) => {
+              const { guess, actual } = formatAttemptData(attempt);
+              return (
               <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-sm">
                 <div className="flex items-center gap-3 text-neutral-400 mb-2 sm:mb-0">
                   <span className="font-mono text-xs">{format(new Date(attempt.timestamp), 'MM/dd HH:mm')}</span>
@@ -300,16 +316,17 @@ export const Profile: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="text-neutral-300">
-                    {attempt.guess || attempt.selectedDirection || attempt.selectedColor?.name || 'N/A'} 
+                    {guess} 
                     <span className="text-neutral-600 mx-2">→</span> 
-                    {attempt.actualTarget || attempt.actualDirection || attempt.actualColor?.name || 'N/A'}
+                    {actual}
                   </span>
                   <span className={`font-bold w-12 text-right ${attempt.isSuccess ? 'text-white' : 'text-neutral-500'}`}>
                     {attempt.isSuccess ? 'HIT' : 'MISS'}
                   </span>
                 </div>
               </div>
-            ))
+              );
+            })
           ) : (
             <p className="text-neutral-500 text-center py-8">No recent attempts found.</p>
           )}
