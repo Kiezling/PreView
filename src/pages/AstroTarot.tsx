@@ -60,10 +60,11 @@ export const AstroTarot: React.FC = () => {
       setActualAttribute(actualTarget.actualAttribute);
       setActualCard(actualTarget.card);
       setIsSuccess(hit);
+      window.dispatchEvent(new CustomEvent('staminaSpent'));
     } catch (error) {
       console.error("Error saving attempt:", error);
       if (error instanceof Error && error.message.includes("Focus Stamina depleted")) {
-        alert("Focus Exhausted. You must wait for your stamina to recharge.");
+        window.dispatchEvent(new CustomEvent('staminaExhausted'));
       }
       setGuess(null);
     } finally {

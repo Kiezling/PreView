@@ -71,10 +71,11 @@ export const Zener: React.FC = () => {
       
       const { actualTarget } = result.data as any;
       setActualCard(actualTarget);
+      window.dispatchEvent(new CustomEvent('staminaSpent'));
     } catch (error) {
       console.error("Error saving attempt:", error);
       if (error instanceof Error && error.message.includes("Focus Stamina depleted")) {
-        alert("Focus Exhausted. You must wait for your stamina to recharge.");
+        window.dispatchEvent(new CustomEvent('staminaExhausted'));
       }
     } finally {
       setIsSubmitting(false);

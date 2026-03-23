@@ -3,7 +3,7 @@ import { useAuth } from '../components/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
-import { ShieldAlert, Database, AlertTriangle, Loader2 } from 'lucide-react';
+import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const { user } = useAuth();
@@ -144,6 +144,49 @@ export const Admin: React.FC = () => {
                 {statusMessage.text}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 mt-8">
+        <div className="flex items-center gap-4 mb-6">
+          <BatteryMedium className="w-8 h-8 text-green-400" />
+          <h2 className="text-2xl font-semibold text-white">Focus Controls</h2>
+        </div>
+        <p className="text-neutral-400 mb-6">
+          Manage focus for your account.
+        </p>
+        
+        <div className="bg-neutral-950 rounded-xl p-6 border border-neutral-800">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <button
+              onClick={async () => {
+                try {
+                  const adminManageStamina = httpsCallable(functions, 'adminManageStamina');
+                  await adminManageStamina({ targetUserId: user?.uid, action: 'refill' });
+                  alert('Focus refilled successfully.');
+                } catch (error: any) {
+                  alert('Error: ' + error.message);
+                }
+              }}
+              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors border border-neutral-700"
+            >
+              Refill Focus (Self)
+            </button>
+            <button
+              onClick={async () => {
+                try {
+                  const adminManageStamina = httpsCallable(functions, 'adminManageStamina');
+                  await adminManageStamina({ targetUserId: user?.uid, action: 'toggleInfinite' });
+                  alert('Toggled infinite focus successfully.');
+                } catch (error: any) {
+                  alert('Error: ' + error.message);
+                }
+              }}
+              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors border border-neutral-700"
+            >
+              Toggle Infinite Focus (Self)
+            </button>
           </div>
         </div>
       </div>

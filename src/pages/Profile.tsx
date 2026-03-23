@@ -7,13 +7,12 @@ import { useAuth } from '../components/AuthContext';
 import { format } from 'date-fns';
 
 export const Profile: React.FC = () => {
-  const { user, refreshPublicProfile } = useAuth();
+  const { user, publicProfile, refreshPublicProfile } = useAuth();
   
   const [publicName, setPublicName] = useState('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
-  const [showAvatar, setShowAvatar] = useState(true);
   const [isSavingAvatar, setIsSavingAvatar] = useState(false);
 
   useEffect(() => {
@@ -26,10 +25,8 @@ export const Profile: React.FC = () => {
         if (publicSnap.exists()) {
           const data = publicSnap.data();
           setPublicName(data.displayName || user.displayName || 'Anonymous User');
-          setShowAvatar(data.showAvatar !== false); // default to true
         } else {
           setPublicName(user.displayName || 'Anonymous User');
-          setShowAvatar(true);
         }
       } catch (error) {
         console.error("Error fetching public profile:", error);
@@ -58,16 +55,13 @@ export const Profile: React.FC = () => {
   };
 
   const toggleAvatar = async () => {
-    if (!user) return;
+    if (!user || !publicProfile) return;
     setIsSavingAvatar(true);
-    const newValue = !showAvatar;
     try {
-      const publicRef = doc(db, 'users_public', user.uid);
-      await updateDoc(publicRef, {
-        showAvatar: newValue,
-        photoURL: newValue ? user.photoURL : null
+      await updateDoc(doc(db, 'users_public', user.uid), { 
+        showAvatar: !publicProfile.showAvatar,
+        photoURL: !publicProfile.showAvatar ? user.photoURL : null
       });
-      setShowAvatar(newValue);
       await refreshPublicProfile();
     } catch (error) {
       console.error("Error updating avatar preference:", error);
@@ -86,21 +80,23 @@ export const Profile: React.FC = () => {
     >
       <header className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-12 bg-neutral-900/50 p-8 rounded-3xl border border-neutral-800 relative">
         <div className="flex flex-col items-center gap-4">
-          {showAvatar && user.photoURL ? (
+          {publicProfile?.showAvatar && user.photoURL ? (
             <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full border-4 border-neutral-800" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-neutral-700">
-              <Brain className="w-10 h-10 text-yellow-500" />
+              <Brain className="w-10 h-10 text-neutral-500" />
             </div>
           )}
-          <button 
-            onClick={toggleAvatar}
-            disabled={isSavingAvatar}
-            className="flex items-center gap-2 text-sm text-neutral-400 hover:text-white transition-colors"
-          >
-            {showAvatar ? <ToggleRight className="w-5 h-5 text-green-500" /> : <ToggleLeft className="w-5 h-5" />}
-            Show Avatar
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={toggleAvatar}
+              disabled={isSavingAvatar}
+              className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors px-1 outline-none ${publicProfile?.showAvatar ? 'bg-white' : 'bg-neutral-700'}`}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full transition-transform ${publicProfile?.showAvatar ? 'bg-black translate-x-6' : 'bg-white translate-x-0'}`} />
+            </button>
+            <span className="text-sm text-neutral-400">Show Avatar</span>
+          </div>
         </div>
         
         <div className="flex-1 text-center md:text-left">

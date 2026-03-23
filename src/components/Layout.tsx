@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
-import { Star, LogOut, User as UserIcon, LogIn, LayoutDashboard, Layers, TrendingUp, Palette, Spade, Brain, XCircle, Headphones, BatteryMedium } from 'lucide-react';
+import { Star, LogOut, User as UserIcon, LogIn, LayoutDashboard, Layers, TrendingUp, Palette, Spade, Brain, XCircle, Headphones, BatteryMedium, X, Shield } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { httpsCallable } from 'firebase/functions';
 import { functions } from '../firebase';
@@ -10,17 +10,81 @@ export const Layout: React.FC = () => {
   const { user, publicProfile, login, logout, authError, clearAuthError, loading } = useAuth();
   const location = useLocation();
   const [stamina, setStamina] = useState<number | null>(null);
-  const [regenTime, setRegenTime] = useState<number | null>(null);
+  const [targetRegenTime, setTargetRegenTime] = useState<number | null>(null);
+  const [isInfinite, setIsInfinite] = useState<boolean>(false);
+  const [showExhaustedModal, setShowExhaustedModal] = useState<boolean>(false);
+  const [timeLeftStr, setTimeLeftStr] = useState<string>('');
+
+  const fetchStamina = useCallback(() => {
+    if (user) {
+      httpsCallable(functions, 'getStaminaStatus')().then(res => {
+        const data = res.data as any;
+        setStamina(data.currentStamina);
+        setTargetRegenTime(Date.now() + data.nextRegenInMs);
+        setIsInfinite(data.isInfinite || false);
+      }).catch(() => {});
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const wakeServer = () => {
+      httpsCallable(functions, 'generateAndGradeTarget')({ ping: true }).catch(() => {});
+    };
+    wakeServer(); // Fire immediately
+    const heartbeat = setInterval(wakeServer, 14 * 60 * 1000); // Fire every 14 mins
+    return () => clearInterval(heartbeat);
+  }, [user]);
 
   useEffect(() => {
     if (user) {
-      httpsCallable(functions, 'generateAndGradeTarget')({ ping: true }).catch(() => {});
-      httpsCallable(functions, 'getStaminaStatus')().then(res => {
-        setStamina((res.data as any).currentStamina);
-        setRegenTime((res.data as any).nextRegenInMs);
-      }).catch(() => {});
+      fetchStamina();
     }
-  }, [location.pathname, user]);
+  }, [location.pathname, user, fetchStamina]);
+
+  useEffect(() => {
+    const handleStaminaSpent = () => {
+      setStamina(prev => {
+        if (prev === null || isInfinite) return prev;
+        const newStamina = Math.max(0, prev - 1);
+        if (prev === 4) {
+          setTargetRegenTime(Date.now() + 15 * 60 * 1000);
+        }
+        return newStamina;
+      });
+    };
+
+    const handleStaminaExhausted = () => {
+      setShowExhaustedModal(true);
+    };
+
+    window.addEventListener('staminaSpent', handleStaminaSpent);
+    window.addEventListener('staminaExhausted', handleStaminaExhausted);
+
+    return () => {
+      window.removeEventListener('staminaSpent', handleStaminaSpent);
+      window.removeEventListener('staminaExhausted', handleStaminaExhausted);
+    };
+  }, [isInfinite]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (targetRegenTime && !isInfinite) {
+        const remaining = targetRegenTime - Date.now();
+        if (remaining <= 0) {
+          setTimeLeftStr('00:00');
+          fetchStamina();
+        } else {
+          const minutes = Math.floor(remaining / 60000);
+          const seconds = Math.floor((remaining % 60000) / 1000);
+          setTimeLeftStr(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
+        }
+      } else {
+        setTimeLeftStr('');
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [targetRegenTime, isInfinite, fetchStamina]);
 
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
@@ -29,7 +93,10 @@ export const Layout: React.FC = () => {
     { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
     { name: 'Astro-Tarot', path: '/astro-tarot', icon: Layers },
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
+    { name: 'Admin Panel', path: '/admin', icon: Shield },
   ];
+
+  const isMaxFocus = stamina === 4 || isInfinite;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans selection:bg-white/30">
@@ -73,9 +140,20 @@ export const Layout: React.FC = () => {
               ) : user ? (
                 <>
                   {stamina !== null && (
-                    <div className="flex items-center gap-2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-1">
-                      <BatteryMedium className={cn("w-4 h-4", stamina === 3 ? "text-green-500" : stamina > 0 ? "text-yellow-500" : "text-red-500")} />
-                      <span className="text-xs font-bold text-white">{stamina} / 3</span>
+                    <div className={`flex flex-col items-center justify-center relative group ${isMaxFocus ? 'cursor-default' : 'cursor-help'}`}>
+                      <span className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-[4px]">Focus</span>
+                      <div className="relative flex items-center border-2 border-neutral-600 rounded-[4px] p-[2px] gap-[2px] w-16 h-[20px]">
+                        <div className="absolute -right-[5px] w-[3px] h-[8px] bg-neutral-600 rounded-r-[2px]"></div>
+                        {[1, 2, 3, 4].map((i) => (
+                          <div key={i} className={`flex-1 h-full rounded-[2px] transition-colors duration-300 ${isInfinite || stamina >= i ? 'bg-white' : 'bg-neutral-800'}`}></div>
+                        ))}
+                        {isInfinite && (
+                          <div className="absolute inset-0 flex items-center justify-center text-black font-bold text-lg bg-white/90 rounded-sm">∞</div>
+                        )}
+                      </div>
+                      <div className="absolute top-full mt-2 right-0 bg-neutral-800 text-white text-xs p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                        {isMaxFocus ? 'Max Focus points' : `Next Focus point in: ${timeLeftStr}`}
+                      </div>
                     </div>
                   )}
                   <Link 
@@ -116,6 +194,31 @@ export const Layout: React.FC = () => {
             <button onClick={clearAuthError} className="text-red-500 hover:text-red-400">
               <XCircle className="w-5 h-5" />
             </button>
+          </div>
+        </div>
+      )}
+
+      {showExhaustedModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl text-center relative">
+            <button 
+              onClick={() => setShowExhaustedModal(false)}
+              className="absolute top-4 right-4"
+            >
+              <X className="w-6 h-6 text-white hover:text-neutral-300 transition-colors cursor-pointer" />
+            </button>
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-6">
+              <XCircle className="w-8 h-8 text-red-500" />
+            </div>
+            <p className="text-xl font-bold text-white mb-6">
+              Your Focus has been exhausted.
+            </p>
+            {!isInfinite && targetRegenTime && (
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4">
+                <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-1">Time until next focus point</p>
+                <p className="text-3xl font-mono text-white">{timeLeftStr}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
