@@ -39,6 +39,10 @@ export const ColorTarget: React.FC = () => {
     setSelectedColor(colorObj);
     
     try {
+      const getStaminaStatus = httpsCallable(functions, 'getStaminaStatus');
+      const staminaResult = await getStaminaStatus();
+      const stamina = (staminaResult.data as any).focusStamina;
+
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
       const result = await generateAndGrade({
         testType: 'Color',
@@ -48,7 +52,8 @@ export const ColorTarget: React.FC = () => {
           timeToDecisionMs,
           sessionSequenceIndex: sequenceIndexRef.current,
           localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          deviceType: getDeviceType()
+          deviceType: getDeviceType(),
+          focusLevelAtAttempt: stamina
         }
       });
       
@@ -100,7 +105,7 @@ export const ColorTarget: React.FC = () => {
         {/* Color Selection */}
         {!selectedColor ? (
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               {COLORS.map((color) => (
                 <motion.button

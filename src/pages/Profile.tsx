@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { User as UserIcon, Calendar, Activity, Star, Layers, TrendingUp, Palette, Edit2, Check, X, Spade, Brain, ToggleLeft, ToggleRight } from 'lucide-react';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc, orderBy, limit } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../components/AuthContext';
 import { format } from 'date-fns';
@@ -13,7 +13,15 @@ export const Profile: React.FC = () => {
   const [isEditingName, setIsEditingName] = useState(false);
   const [editNameValue, setEditNameValue] = useState('');
   const [isSavingName, setIsSavingName] = useState(false);
-  const [isSavingAvatar, setIsSavingAvatar] = useState(false);
+  const [localShowAvatar, setLocalShowAvatar] = useState(publicProfile?.showAvatar ?? true);
+  const [attempts, setAttempts] = useState<any[]>([]);
+  const [filterMode, setFilterMode] = useState<string>('All');
+
+  useEffect(() => {
+    if (publicProfile) {
+      setLocalShowAvatar(publicProfile.showAvatar ?? true);
+    }
+  }, [publicProfile]);
 
   useEffect(() => {
     if (!user) return;
@@ -56,20 +64,78 @@ export const Profile: React.FC = () => {
 
   const toggleAvatar = async () => {
     if (!user) return;
-    setIsSavingAvatar(true);
+    const newShowAvatar = !localShowAvatar;
+    setLocalShowAvatar(newShowAvatar);
     try {
-      const currentShowAvatar = publicProfile?.showAvatar || false;
       await setDoc(doc(db, 'users_public', user.uid), { 
-        showAvatar: !currentShowAvatar,
-        photoURL: !currentShowAvatar ? user.photoURL : null
+        showAvatar: newShowAvatar,
+        photoURL: newShowAvatar ? user.photoURL : null
       }, { merge: true });
       await refreshPublicProfile();
     } catch (error) {
       console.error("Error updating avatar preference:", error);
-    } finally {
-      setIsSavingAvatar(false);
+      setLocalShowAvatar(!newShowAvatar);
     }
   };
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchUserStats = async () => {
+      try {
+        const collections = ['zenerAttempts', 'colorAttempts', 'astroTarotAttempts', 'standardDeckAttempts'];
+        let allAttempts: any[] = [];
+
+        for (const col of collections) {
+          const q = query(
+            collection(db, col),
+            where('userId', '==', user.uid)
+          );
+          const snap = await getDocs(q);
+          snap.forEach(doc => {
+            allAttempts.push({ id: doc.id, mode: col.replace('Attempts', ''), ...doc.data() });
+          });
+        }
+
+        allAttempts.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        setAttempts(allAttempts);
+      } catch (error) {
+        console.error("Error fetching user stats:", error);
+      }
+    };
+
+    fetchUserStats();
+  }, [user]);
+
+  const getChronobiologyData = () => {
+    const filtered = filterMode === 'All' ? attempts : attempts.filter(a => a.mode.toLowerCase().includes(filterMode.toLowerCase()));
+    
+    const buckets = [
+      { label: '00-03', total: 0, hits: 0 },
+      { label: '04-07', total: 0, hits: 0 },
+      { label: '08-11', total: 0, hits: 0 },
+      { label: '12-15', total: 0, hits: 0 },
+      { label: '16-19', total: 0, hits: 0 },
+      { label: '20-23', total: 0, hits: 0 },
+    ];
+
+    filtered.forEach(attempt => {
+      const hour = new Date(attempt.timestamp).getHours();
+      const bucketIndex = Math.floor(hour / 4);
+      if (buckets[bucketIndex]) {
+        buckets[bucketIndex].total++;
+        if (attempt.isSuccess) buckets[bucketIndex].hits++;
+      }
+    });
+
+    return buckets.map(b => ({
+      ...b,
+      percentage: b.total > 0 ? Math.round((b.hits / b.total) * 100) : 0
+    }));
+  };
+
+  const chronoData = getChronobiologyData();
+  const recentAttempts = attempts.slice(0, 15);
 
   if (!user) return null;
 
@@ -81,20 +147,19 @@ export const Profile: React.FC = () => {
     >
       <header className="flex flex-col md:flex-row items-center md:items-start gap-6 mb-12 bg-neutral-900/50 p-8 rounded-3xl border border-neutral-800 relative">
         <div className="flex flex-col items-center gap-4">
-          {publicProfile?.showAvatar && user.photoURL ? (
+          {localShowAvatar && user.photoURL ? (
             <img src={user.photoURL} alt="Profile" className="w-24 h-24 rounded-full border-4 border-neutral-800" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-24 h-24 rounded-full bg-neutral-800 flex items-center justify-center border-4 border-neutral-700">
-              <Brain className="w-10 h-10 text-neutral-500" />
+              <UserIcon className="w-10 h-10 text-neutral-500" />
             </div>
           )}
           <div className="flex items-center gap-3">
             <button 
               onClick={toggleAvatar}
-              disabled={isSavingAvatar}
-              className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors px-1 outline-none ${publicProfile?.showAvatar ? 'bg-white' : 'bg-neutral-700'}`}
+              className={`relative inline-flex h-6 w-12 items-center rounded-full transition-colors px-1 outline-none ${localShowAvatar ? 'bg-white' : 'bg-neutral-700'}`}
             >
-              <span className={`inline-block h-4 w-4 transform rounded-full transition-transform ${publicProfile?.showAvatar ? 'bg-black translate-x-6' : 'bg-white translate-x-0'}`} />
+              <span className={`inline-block h-4 w-4 transform rounded-full transition-transform ${localShowAvatar ? 'bg-black translate-x-6' : 'bg-white translate-x-0'}`} />
             </button>
             <span className="text-sm text-neutral-400">Show Avatar</span>
           </div>
@@ -150,8 +215,88 @@ export const Profile: React.FC = () => {
         </div>
       </header>
 
-      <div className="text-center py-12 bg-neutral-900/50 border border-neutral-800 rounded-3xl">
-        <p className="text-xl text-neutral-400">More to come.</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        {/* Recent Attempt Ledger */}
+        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
+          <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+            <Activity className="w-5 h-5" />
+            Recent Attempt Ledger
+          </h2>
+          <div className="max-h-64 overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+            {recentAttempts.length > 0 ? (
+              recentAttempts.map((attempt) => (
+                <div key={attempt.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 rounded-xl bg-neutral-950 border border-neutral-800 text-sm">
+                  <div className="flex items-center gap-3 text-neutral-400 mb-2 sm:mb-0">
+                    <span className="font-mono text-xs">{format(new Date(attempt.timestamp), 'MM/dd HH:mm')}</span>
+                    <span className="uppercase tracking-wider text-[10px] font-bold px-2 py-0.5 rounded bg-neutral-800 text-white">{attempt.mode}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-neutral-300">
+                      {attempt.guess || attempt.selectedDirection || attempt.selectedColor?.name || 'N/A'} 
+                      <span className="text-neutral-600 mx-2">→</span> 
+                      {attempt.actualTarget || attempt.actualDirection || attempt.actualColor?.name || 'N/A'}
+                    </span>
+                    <span className={`font-bold w-12 text-right ${attempt.isSuccess ? 'text-white' : 'text-neutral-500'}`}>
+                      {attempt.isSuccess ? 'HIT' : 'MISS'}
+                    </span>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="text-neutral-500 text-center py-8">No recent attempts found.</p>
+            )}
+          </div>
+        </div>
+
+        {/* Temporal Performance (Chronobiology) */}
+        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-xl font-bold text-white flex items-center gap-2">
+              <Calendar className="w-5 h-5" />
+              Temporal Performance
+            </h2>
+            <select 
+              value={filterMode}
+              onChange={(e) => setFilterMode(e.target.value)}
+              className="bg-neutral-950 border border-neutral-800 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:border-white"
+            >
+              <option value="All">All Modes</option>
+              <option value="zener">Zener</option>
+              <option value="color">Color</option>
+              <option value="astroTarot">Tarot</option>
+              <option value="standardDeck">Deck</option>
+            </select>
+          </div>
+          
+          <div className="flex items-end justify-between h-40 gap-2 mb-4">
+            {chronoData.map((bucket) => (
+              <div key={bucket.label} className="flex flex-col items-center flex-1 gap-2 group">
+                <div className="w-full bg-neutral-800 rounded-t-sm h-full flex items-end relative overflow-hidden">
+                  <div 
+                    className="w-full bg-white transition-all duration-500"
+                    style={{ height: `${bucket.percentage}%` }}
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/50">
+                    <span className="text-xs font-bold text-white">{bucket.percentage}%</span>
+                  </div>
+                </div>
+                <span className="text-[10px] text-neutral-500 font-mono">{bucket.label}</span>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-neutral-500 text-center mt-4">Accuracy by local hour (4-hour buckets)</p>
+        </div>
+
+        {/* Focus State Correlation */}
+        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 lg:col-span-2">
+          <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+            <Brain className="w-5 h-5" />
+            Focus State Correlation
+          </h2>
+          <div className="bg-neutral-950 border border-neutral-800 rounded-2xl p-8 text-center">
+            <p className="text-neutral-400 font-mono text-sm">Insufficient Data: Focus telemetry collection initiated.</p>
+          </div>
+        </div>
       </div>
     </motion.div>
   );

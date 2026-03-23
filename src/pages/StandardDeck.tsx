@@ -50,6 +50,10 @@ export const StandardDeck: React.FC = () => {
     setSelectedOption(option);
     
     try {
+      const getStaminaStatus = httpsCallable(functions, 'getStaminaStatus');
+      const staminaResult = await getStaminaStatus();
+      const stamina = (staminaResult.data as any).focusStamina;
+
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
       const result = await generateAndGrade({
         testType: 'StandardDeck',
@@ -60,7 +64,8 @@ export const StandardDeck: React.FC = () => {
           timeToDecisionMs,
           sessionSequenceIndex: sequenceIndexRef.current,
           localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          deviceType: getDeviceType()
+          deviceType: getDeviceType(),
+          focusLevelAtAttempt: stamina
         }
       });
       
@@ -169,7 +174,7 @@ export const StandardDeck: React.FC = () => {
 
             {!selectedOption ? (
               <div>
-                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
+                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
                 <div className="flex flex-wrap justify-center gap-4">
                   {getOptions().map((option) => (
                     <button

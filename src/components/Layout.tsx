@@ -170,10 +170,9 @@ export const Layout: React.FC = () => {
                       <img src={publicProfile.photoURL} alt="Profile" className="w-8 h-8 rounded-full border border-neutral-700" referrerPolicy="no-referrer" />
                     ) : (
                       <div className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center border border-neutral-700">
-                        <Brain className="w-4 h-4 text-white" />
+                        <UserIcon className="w-5 h-5 text-white" />
                       </div>
                     )}
-                    <span className="hidden sm:inline truncate max-w-[120px]">{publicProfile?.displayName || user.displayName || 'Profile'}</span>
                   </Link>
                   <button
                     onClick={logout}

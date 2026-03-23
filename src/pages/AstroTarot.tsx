@@ -42,6 +42,10 @@ export const AstroTarot: React.FC = () => {
     sequenceIndexRef.current += 1;
 
     try {
+      const getStaminaStatus = httpsCallable(functions, 'getStaminaStatus');
+      const staminaResult = await getStaminaStatus();
+      const stamina = (staminaResult.data as any).focusStamina;
+
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
       const result = await generateAndGrade({
         testType: 'AstroTarot',
@@ -52,7 +56,8 @@ export const AstroTarot: React.FC = () => {
           timeToDecisionMs,
           sessionSequenceIndex: sequenceIndexRef.current,
           localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          deviceType: getDeviceType()
+          deviceType: getDeviceType(),
+          focusLevelAtAttempt: stamina
         }
       });
       
@@ -150,7 +155,7 @@ export const AstroTarot: React.FC = () => {
 
             {!guess ? (
               <div>
-                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection below will expend 1 Focus.</p>
+                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
                 <div className="flex flex-wrap justify-center gap-4">
                   {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
                     <button
