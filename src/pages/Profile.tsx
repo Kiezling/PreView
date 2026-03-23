@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { User as UserIcon, Calendar, Activity, Star, Layers, TrendingUp, Palette, Edit2, Check, X, Spade, Brain, ToggleLeft, ToggleRight } from 'lucide-react';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { useAuth } from '../components/AuthContext';
 import { format } from 'date-fns';
@@ -55,13 +55,14 @@ export const Profile: React.FC = () => {
   };
 
   const toggleAvatar = async () => {
-    if (!user || !publicProfile) return;
+    if (!user) return;
     setIsSavingAvatar(true);
     try {
-      await updateDoc(doc(db, 'users_public', user.uid), { 
-        showAvatar: !publicProfile.showAvatar,
-        photoURL: !publicProfile.showAvatar ? user.photoURL : null
-      });
+      const currentShowAvatar = publicProfile?.showAvatar || false;
+      await setDoc(doc(db, 'users_public', user.uid), { 
+        showAvatar: !currentShowAvatar,
+        photoURL: !currentShowAvatar ? user.photoURL : null
+      }, { merge: true });
       await refreshPublicProfile();
     } catch (error) {
       console.error("Error updating avatar preference:", error);

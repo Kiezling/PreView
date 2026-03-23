@@ -29,6 +29,8 @@ export const Layout: React.FC = () => {
   useEffect(() => {
     if (!user) return;
     const wakeServer = () => {
+      httpsCallable(functions, 'preWarmPing')().catch(() => {});
+      httpsCallable(functions, 'getMarketData')({ ping: true }).catch(() => {});
       httpsCallable(functions, 'generateAndGradeTarget')({ ping: true }).catch(() => {});
     };
     wakeServer(); // Fire immediately
@@ -93,7 +95,6 @@ export const Layout: React.FC = () => {
     { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
     { name: 'Astro-Tarot', path: '/astro-tarot', icon: Layers },
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
-    { name: 'Admin Panel', path: '/admin', icon: Shield },
   ];
 
   const isMaxFocus = stamina === 4 || isInfinite;
@@ -104,10 +105,14 @@ export const Layout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <Link to="/" className="flex items-center gap-2 text-3xl font-bold tracking-tight text-white hover:text-neutral-200 transition-colors">
-                <Brain className="w-8 h-8 text-white" />
-                PreView
-              </Link>
+              <div className="flex items-center gap-2">
+                <Link to="/admin" className="hover:opacity-80 transition-opacity">
+                  <Brain className="w-8 h-8 text-white" />
+                </Link>
+                <Link to="/" className="text-3xl font-bold tracking-tight text-white hover:text-neutral-200 transition-colors">
+                  PreView
+                </Link>
+              </div>
               
               {user && (
                 <div className="hidden md:ml-10 md:flex md:space-x-4">
@@ -151,7 +156,7 @@ export const Layout: React.FC = () => {
                           <div className="absolute inset-0 flex items-center justify-center text-black font-bold text-lg bg-white/90 rounded-sm">∞</div>
                         )}
                       </div>
-                      <div className="absolute top-full mt-2 right-0 bg-neutral-800 text-white text-xs p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                      <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 bg-neutral-800 text-white text-xs p-2 rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
                         {isMaxFocus ? 'Max Focus points' : `Next Focus point in: ${timeLeftStr}`}
                       </div>
                     </div>
@@ -186,12 +191,12 @@ export const Layout: React.FC = () => {
 
       {authError && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4">
-          <div className="bg-red-500/10 border border-red-500/50 text-red-500 p-4 rounded-lg flex justify-between items-center">
+          <div className="bg-white/10 border border-white/50 text-white p-4 rounded-lg flex justify-between items-center">
             <div>
               <p className="font-bold">Authentication Error</p>
               <p className="font-mono text-sm">{authError}</p>
             </div>
-            <button onClick={clearAuthError} className="text-red-500 hover:text-red-400">
+            <button onClick={clearAuthError} className="text-white hover:text-neutral-300">
               <XCircle className="w-5 h-5" />
             </button>
           </div>
@@ -207,8 +212,8 @@ export const Layout: React.FC = () => {
             >
               <X className="w-6 h-6 text-white hover:text-neutral-300 transition-colors cursor-pointer" />
             </button>
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/10 mb-6">
-              <XCircle className="w-8 h-8 text-red-500" />
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 mb-6">
+              <XCircle className="w-8 h-8 text-white" />
             </div>
             <p className="text-xl font-bold text-white mb-6">
               Your Focus has been exhausted.

@@ -149,7 +149,7 @@ export const AstroTarot: React.FC = () => {
             </div>
 
             {!guess ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              <div className="flex flex-wrap justify-center gap-4">
                 {CATEGORIES[guessType as keyof typeof CATEGORIES].map(option => (
                   <button
                     key={option}

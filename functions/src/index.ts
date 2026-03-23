@@ -46,6 +46,10 @@ export const getMarketData = functions.https.onCall(async (request) => {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
+  if (request.data && request.data.ping) {
+    return { status: 'pong', timestamp: new Date().toISOString() };
+  }
+
   try {
     const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=5d&interval=1d';
     const response = await fetch(url);
@@ -65,6 +69,10 @@ export const getMarketData = functions.https.onCall(async (request) => {
 export const generateAndGradeTarget = functions.https.onCall(async (request) => {
   if (!request.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  }
+
+  if (request.data && request.data.ping) {
+    return { status: 'pong', timestamp: new Date().toISOString() };
   }
 
   const { testType, guess, targetId, telemetry, guessType, targetDate } = request.data;

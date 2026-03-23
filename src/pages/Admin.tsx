@@ -3,7 +3,7 @@ import { useAuth } from '../components/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
-import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium } from 'lucide-react';
+import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, TrendingUp } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const { user } = useAuth();
@@ -14,6 +14,7 @@ export const Admin: React.FC = () => {
   const [moduleName, setModuleName] = useState<string>('All');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [focusStatusMessage, setFocusStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
 
   useEffect(() => {
@@ -144,6 +145,23 @@ export const Admin: React.FC = () => {
                 {statusMessage.text}
               </div>
             )}
+
+            <div className="mt-6 pt-6 border-t border-neutral-800">
+              <h3 className="text-lg font-medium text-white mb-4">Quick Actions</h3>
+              <button
+                onClick={() => {
+                  if (!user) return;
+                  setTargetUserId(user.uid);
+                  setModuleName('Stock');
+                  setShowConfirm(true);
+                }}
+                disabled={isSubmitting}
+                className="w-full flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <TrendingUp className="w-5 h-5" />}
+                Clear My Stock Attempts
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -161,12 +179,13 @@ export const Admin: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-4">
             <button
               onClick={async () => {
+                setFocusStatusMessage(null);
                 try {
                   const adminManageStamina = httpsCallable(functions, 'adminManageStamina');
                   await adminManageStamina({ targetUserId: user?.uid, action: 'refill' });
-                  alert('Focus refilled successfully.');
+                  setFocusStatusMessage({ type: 'success', text: 'Focus refilled successfully.' });
                 } catch (error: any) {
-                  alert('Error: ' + error.message);
+                  setFocusStatusMessage({ type: 'error', text: 'Error: ' + error.message });
                 }
               }}
               className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors border border-neutral-700"
@@ -175,12 +194,13 @@ export const Admin: React.FC = () => {
             </button>
             <button
               onClick={async () => {
+                setFocusStatusMessage(null);
                 try {
                   const adminManageStamina = httpsCallable(functions, 'adminManageStamina');
                   await adminManageStamina({ targetUserId: user?.uid, action: 'toggleInfinite' });
-                  alert('Toggled infinite focus successfully.');
+                  setFocusStatusMessage({ type: 'success', text: 'Toggled infinite focus successfully.' });
                 } catch (error: any) {
-                  alert('Error: ' + error.message);
+                  setFocusStatusMessage({ type: 'error', text: 'Error: ' + error.message });
                 }
               }}
               className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors border border-neutral-700"
@@ -188,6 +208,11 @@ export const Admin: React.FC = () => {
               Toggle Infinite Focus (Self)
             </button>
           </div>
+          {focusStatusMessage && (
+            <div className={`mt-4 p-4 rounded-lg border ${focusStatusMessage.type === 'success' ? 'bg-green-900/20 border-green-900/50 text-green-400' : 'bg-red-900/20 border-red-900/50 text-red-400'}`}>
+              {focusStatusMessage.text}
+            </div>
+          )}
         </div>
       </div>
 
