@@ -96,6 +96,7 @@ export const Layout: React.FC = () => {
     { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
     { name: 'Astro-Tarot', path: '/astro-tarot', icon: Layers },
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
+    { name: 'Admin', path: '/admin', icon: Shield },
   ];
 
   const isMaxFocus = stamina === 4 || isInfinite;
@@ -174,6 +175,7 @@ export const Layout: React.FC = () => {
                         <UserIcon className="w-5 h-5 text-white" />
                       </div>
                     )}
+                    <span className="hidden sm:inline truncate max-w-[120px]">{publicProfile?.displayName || user.displayName || 'Profile'}</span>
                   </Link>
                   <button
                     onClick={logout}

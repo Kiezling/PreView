@@ -223,32 +223,26 @@ export const purgeUserRecords = functions.https.onCall(async (request) => {
     throw new functions.https.HttpsError('permission-denied', 'Must be admin');
   }
 
-  const { targetUserId, moduleName } = request.data;
-  if (!targetUserId || !moduleName) {
+  const { targetUserId } = request.data;
+  if (!targetUserId) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
   }
 
-  const collectionMap: Record<string, string> = {
-    'Zener': 'zenerAttempts',
-    'Color': 'colorAttempts',
-    'Stock': 'stockAttempts',
-    'AstroTarot': 'astroTarotAttempts',
-    'StandardDeck': 'standardDeckAttempts'
-  };
-
-  const collectionName = collectionMap[moduleName];
-  if (!collectionName) {
-    throw new functions.https.HttpsError('invalid-argument', 'Invalid module name');
-  }
-
-  const snapshot = await db.collection(collectionName).where('userId', '==', targetUserId).get();
+  const collectionsToPurge = ['stockAttempts'];
   const batch = db.batch();
-  snapshot.docs.forEach(doc => {
-    batch.delete(doc.ref);
-  });
+  let deletedCount = 0;
+
+  for (const collectionName of collectionsToPurge) {
+    const snapshot = await db.collection(collectionName).where('userId', '==', targetUserId).get();
+    snapshot.docs.forEach(doc => {
+      batch.delete(doc.ref);
+      deletedCount++;
+    });
+  }
+  
   await batch.commit();
 
-  return { success: true, deletedCount: snapshot.size };
+  return { success: true, deletedCount };
 });
 
 export const adminManageStamina = functions.https.onCall(async (request) => {

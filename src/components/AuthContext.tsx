@@ -3,36 +3,10 @@ import { User, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/aut
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../firebase';
 
-export interface PublicProfile {
-  displayName: string | null;
-  photoURL: string | null;
-  showAvatar: boolean;
-}
+export interface PublicProfile { displayName: string | null; photoURL: string | null; showAvatar: boolean; }
+interface AuthContextType { user: User | null; publicProfile: PublicProfile | null; loading: boolean; authError: string | null; login: () => Promise<void>; logout: () => Promise<void>; refreshPublicProfile: () => Promise<void>; setOptimisticProfile: (profile: Partial<PublicProfile>) => void; clearAuthError: () => void; }
 
-interface AuthContextType {
-  user: User | null;
-  publicProfile: PublicProfile | null;
-  loading: boolean;
-  authError: string | null;
-  login: () => Promise<void>;
-  logout: () => Promise<void>;
-  refreshPublicProfile: () => Promise<void>;
-  setOptimisticProfile: (profile: Partial<PublicProfile>) => void;
-  clearAuthError: () => void;
-}
-
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  publicProfile: null,
-  loading: true,
-  authError: null,
-  login: async () => {},
-  logout: async () => {},
-  refreshPublicProfile: async () => {},
-  setOptimisticProfile: () => {},
-  clearAuthError: () => {},
-});
-
+const AuthContext = createContext<AuthContextType>({ user: null, publicProfile: null, loading: true, authError: null, login: async () => {}, logout: async () => {}, refreshPublicProfile: async () => {}, setOptimisticProfile: () => {}, clearAuthError: () => {}, });
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -42,33 +16,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const setOptimisticProfile = (updates: Partial<PublicProfile>) => {
-    setPublicProfile(prev => prev ? { ...prev, ...updates } : null);
+    setPublicProfile(prev => prev ? { ...prev, ...updates } : { displayName: null, photoURL: null, showAvatar: true, ...updates });
   };
 
   const fetchPublicProfile = async (uid: string) => {
     try {
-      const publicRef = doc(db, 'users_public', uid);
-      const publicSnap = await getDoc(publicRef);
-      if (publicSnap.exists()) {
-        const data = publicSnap.data();
-        setPublicProfile({
-          displayName: data.displayName || null,
-          photoURL: data.photoURL || null,
-          showAvatar: data.showAvatar !== false,
-        });
-      } else {
-        setPublicProfile(null);
-      }
-    } catch (error) {
-      console.error("Error fetching public profile:", error);
-    }
+      const snap = await getDoc(doc(db, 'users_public', uid));
+      if (snap.exists()) setPublicProfile({ displayName: snap.data().displayName || null, photoURL: snap.data().photoURL || null, showAvatar: snap.data().showAvatar !== false });
+    } catch (e) { console.error(e); }
   };
-
-  const refreshPublicProfile = async () => {
-    if (user) {
-      await fetchPublicProfile(user.uid);
-    }
-  };
+  const refreshPublicProfile = async () => { if (user) await fetchPublicProfile(user.uid); };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -77,79 +34,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
           const publicRef = doc(db, 'users_public', currentUser.uid);
           const publicSnap = await getDoc(publicRef);
-          
           if (publicSnap.exists()) {
-            const data = publicSnap.data();
-            setPublicProfile({
-              displayName: data.displayName || null,
-              photoURL: data.photoURL || null,
-              showAvatar: data.showAvatar !== false,
-            });
+            setPublicProfile({ displayName: publicSnap.data().displayName || null, photoURL: publicSnap.data().photoURL || null, showAvatar: publicSnap.data().showAvatar !== false });
           } else {
-            const userRef = doc(db, 'users', currentUser.uid);
-            const userSnap = await getDoc(userRef);
-            if (!userSnap.exists()) {
-              await setDoc(userRef, {
-                uid: currentUser.uid,
-                email: currentUser.email || null,
-                displayName: currentUser.displayName || null,
-                photoURL: currentUser.photoURL || null,
-                createdAt: new Date().toISOString(),
-              });
-            }
-            await setDoc(publicRef, {
-              uid: currentUser.uid,
-              displayName: currentUser.displayName || null,
-              photoURL: currentUser.photoURL || null,
-              showAvatar: true,
-            });
-            setPublicProfile({
-              displayName: currentUser.displayName || null,
-              photoURL: currentUser.photoURL || null,
-              showAvatar: true,
-            });
+            const fallback = { displayName: currentUser.displayName || 'Profile', photoURL: currentUser.photoURL || null, showAvatar: true };
+            setPublicProfile(fallback);
+            setDoc(doc(db, 'users', currentUser.uid), { uid: currentUser.uid, email: currentUser.email || null, displayName: currentUser.displayName || null, photoURL: currentUser.photoURL || null, createdAt: new Date().toISOString() }, { merge: true }).catch(()=>{});
+            setDoc(publicRef, { uid: currentUser.uid, ...fallback }, { merge: true }).catch(()=>{});
           }
         } catch (error) {
-          console.error("Error during auth state initialization:", error);
-        } finally {
-          setLoading(false);
+          setPublicProfile({ displayName: currentUser.displayName || 'Profile', photoURL: currentUser.photoURL || null, showAvatar: true });
         }
-      } else {
-        setPublicProfile(null);
-        setLoading(false);
-      }
+      } else { setPublicProfile(null); }
+      setLoading(false);
     });
-
     return () => unsubscribe();
   }, []);
 
-  const login = async () => {
-    try {
-      setAuthError(null);
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      if (error.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      console.error("Login failed:", error);
-      setAuthError(error.code || error.message || String(error));
-    }
-  };
-
-  const logout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error: any) {
-      console.error("Logout failed:", error);
-      setAuthError(error.code || error.message || String(error));
-    }
-  };
-
+  const login = async () => { try { setAuthError(null); await signInWithPopup(auth, googleProvider); } catch (e: any) { if (e.code !== 'auth/popup-closed-by-user') setAuthError(e.message); } };
+  const logout = async () => { try { await signOut(auth); } catch (e: any) { setAuthError(e.message); } };
   const clearAuthError = () => setAuthError(null);
 
-  return (
-    <AuthContext.Provider value={{ user, publicProfile, loading, authError, login, logout, refreshPublicProfile, setOptimisticProfile, clearAuthError }}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={{ user, publicProfile, loading, authError, login, logout, refreshPublicProfile, setOptimisticProfile, clearAuthError }}>{children}</AuthContext.Provider>;
 };

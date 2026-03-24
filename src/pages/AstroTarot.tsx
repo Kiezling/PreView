@@ -56,8 +56,7 @@ export const AstroTarot: React.FC = () => {
           timeToDecisionMs,
           sessionSequenceIndex: sequenceIndexRef.current,
           localTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-          deviceType: getDeviceType(),
-          focusLevelAtAttempt: stamina
+          deviceType: getDeviceType()
         }
       });
       
