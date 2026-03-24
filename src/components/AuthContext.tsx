@@ -74,47 +74,50 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       if (currentUser) {
-        // Ensure users_public is fetched on initial load
-        const publicRef = doc(db, 'users_public', currentUser.uid);
-        const publicSnap = await getDoc(publicRef);
-        
-        if (publicSnap.exists()) {
-          const data = publicSnap.data();
-          setPublicProfile({
-            displayName: data.displayName || null,
-            photoURL: data.photoURL || null,
-            showAvatar: data.showAvatar !== false,
-          });
-        } else {
-          // Ensure user profile exists in Firestore
-          const userRef = doc(db, 'users', currentUser.uid);
-          const userSnap = await getDoc(userRef);
-          if (!userSnap.exists()) {
-            await setDoc(userRef, {
+        try {
+          const publicRef = doc(db, 'users_public', currentUser.uid);
+          const publicSnap = await getDoc(publicRef);
+          
+          if (publicSnap.exists()) {
+            const data = publicSnap.data();
+            setPublicProfile({
+              displayName: data.displayName || null,
+              photoURL: data.photoURL || null,
+              showAvatar: data.showAvatar !== false,
+            });
+          } else {
+            const userRef = doc(db, 'users', currentUser.uid);
+            const userSnap = await getDoc(userRef);
+            if (!userSnap.exists()) {
+              await setDoc(userRef, {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: currentUser.displayName,
+                photoURL: currentUser.photoURL,
+                createdAt: new Date().toISOString(),
+              });
+            }
+            await setDoc(publicRef, {
               uid: currentUser.uid,
-              email: currentUser.email,
               displayName: currentUser.displayName,
               photoURL: currentUser.photoURL,
-              createdAt: new Date().toISOString(),
+              showAvatar: true,
+            });
+            setPublicProfile({
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+              showAvatar: true,
             });
           }
-          
-          await setDoc(publicRef, {
-            uid: currentUser.uid,
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            showAvatar: true,
-          });
-          setPublicProfile({
-            displayName: currentUser.displayName,
-            photoURL: currentUser.photoURL,
-            showAvatar: true,
-          });
+        } catch (error) {
+          console.error("Error during auth state initialization:", error);
+        } finally {
+          setLoading(false);
         }
       } else {
         setPublicProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
