@@ -135,16 +135,21 @@ export const generateAndGradeTarget = functions.https.onCall(async (data: any, c
     actualTarget = { attributes: actualAttributes, card: randomCard };
     
     axisResults = {};
+    let hitCount = 0;
     Object.entries(guess).forEach(([key, value]) => {
       if (value) {
-        axisResults![key] = actualAttributes[key as keyof typeof actualAttributes] === value;
+        const hit = actualAttributes[key as keyof typeof actualAttributes] === value;
+        axisResults![key] = hit;
+        if (hit) hitCount++;
       }
     });
     
+    isSuccess = hitCount > 0; 
     collectionName = 'astroTarotAttempts';
     record.selectedAttributes = guess;
     record.actualAttributes = actualAttributes;
     record.axisResults = axisResults;
+    record.isSuccess = isSuccess; 
   } else if (testType === 'Stock') {
     actualTarget = 'Pending';
     isSuccess = false;
@@ -351,7 +356,7 @@ export const getStaminaStatus = functions.https.onCall(async (data: any, context
   const userStatsDoc = await db.collection('userStats').doc(context.auth.uid).get();
   
   if (!userStatsDoc.exists) {
-    return { currentStamina: 4, nextRegenInMs: 0, isInfinite: false };
+    return { currentStamina: 4, remainingMs: 0, isInfinite: false };
   }
 
   const stats = userStatsDoc.data();

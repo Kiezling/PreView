@@ -41,6 +41,11 @@ export const AstroTarot: React.FC = () => {
     const timeToDecisionMs = Date.now() - startTimeRef.current;
     sequenceIndexRef.current += 1;
 
+    let formattedGuess: any = {};
+    if (guessType === 'Energy') formattedGuess.valence = selectedOption;
+    if (guessType === 'Element') formattedGuess.element = selectedOption;
+    if (guessType === 'Archetype') formattedGuess.archetype = selectedOption;
+
     try {
       const getStaminaStatus = httpsCallable(functions, 'getStaminaStatus');
       const staminaResult = await getStaminaStatus();
@@ -50,7 +55,7 @@ export const AstroTarot: React.FC = () => {
       const result = await generateAndGrade({
         testType: 'AstroTarot',
         guessType: guessType,
-        guess: selectedOption,
+        guess: formattedGuess,
         targetId,
         telemetry: {
           timeToDecisionMs,
@@ -61,7 +66,12 @@ export const AstroTarot: React.FC = () => {
       });
       
       const { actualTarget, isSuccess: hit } = result.data as any;
-      setActualAttribute(actualTarget.actualAttribute);
+      let actualAttr = '';
+      if (guessType === 'Energy') actualAttr = actualTarget.attributes.valence;
+      if (guessType === 'Element') actualAttr = actualTarget.attributes.element;
+      if (guessType === 'Archetype') actualAttr = actualTarget.attributes.archetype;
+      
+      setActualAttribute(actualAttr);
       setActualCard(actualTarget.card);
       setIsSuccess(hit);
       window.dispatchEvent(new CustomEvent('staminaSpent'));

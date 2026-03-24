@@ -20,7 +20,7 @@ export const Layout: React.FC = () => {
       httpsCallable(functions, 'getStaminaStatus')().then(res => {
         const data = res.data as any;
         setStamina(data.currentStamina);
-        setTargetRegenTime(Date.now() + data.remainingMs);
+        setTargetRegenTime(data.remainingMs > 0 ? Date.now() + data.remainingMs : null);
         setIsInfinite(data.isInfinite || false);
       }).catch(() => {});
     }
@@ -73,6 +73,7 @@ export const Layout: React.FC = () => {
         const remaining = targetRegenTime - Date.now();
         if (remaining <= 0) {
           setTimeLeftStr('00:00');
+          setTargetRegenTime(null);
           fetchStamina();
         } else {
           const minutes = Math.floor(remaining / 60000);

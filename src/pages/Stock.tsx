@@ -243,8 +243,11 @@ export const Stock: React.FC = () => {
     const canvas = canvasRef.current;
     if (canvas) {
       const dataUrl = canvas.toDataURL();
-      const newHistory = history.slice(0, historyStep + 1);
+      let newHistory = history.slice(0, historyStep + 1);
       newHistory.push(dataUrl);
+      if (newHistory.length > 15) {
+          newHistory = newHistory.slice(newHistory.length - 15);
+      }
       setHistory(newHistory);
       setHistoryStep(newHistory.length - 1);
       sessionStorage.setItem('sketch_' + format(targetDate, 'yyyy-MM-dd'), dataUrl);
