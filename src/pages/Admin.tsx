@@ -3,7 +3,7 @@ import { useAuth } from '../components/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
-import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, TrendingUp } from 'lucide-react';
+import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, TrendingUp, ToggleRight } from 'lucide-react';
 
 export const Admin: React.FC = () => {
   const { user } = useAuth();
@@ -205,9 +205,13 @@ export const Admin: React.FC = () => {
                   setFocusStatusMessage({ type: 'error', text: 'Error: ' + error.message });
                 }
               }}
-              className="flex-1 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors border border-neutral-700"
+              className="flex-1 flex items-center justify-between bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-6 rounded-lg transition-colors border border-neutral-700"
             >
-              Toggle Infinite Focus (Self)
+              <span>Infinite Focus (Self)</span>
+              <div className="flex items-center gap-2 text-sm font-normal text-neutral-400">
+                <span>Toggle Mode</span>
+                <ToggleRight className="w-5 h-5 text-indigo-400" />
+              </div>
             </button>
           </div>
           {focusStatusMessage && (

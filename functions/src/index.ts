@@ -167,9 +167,11 @@ export const generateAndGradeTarget = functions.https.onCall(async (data: any, c
     const userStatsDoc = await transaction.get(userStatsRef);
     
     let stats = userStatsDoc.data();
-    let currentStamina = typeof stats?.focusStamina === 'number' ? stats.focusStamina : 4;
-    let nextRefill = stats?.nextRefill ?? null;
-    let isInfinite = stats?.isInfinite ?? false;
+    
+    // Strict sanitization to prevent NaN corruption
+    let currentStamina = (stats && typeof stats.focusStamina === 'number' && !isNaN(stats.focusStamina)) ? stats.focusStamina : 4;
+    let nextRefill = (stats && stats.nextRefill) ? stats.nextRefill : null;
+    let isInfinite = (stats && stats.isInfinite) ? stats.isInfinite : false;
 
     const now = Date.now();
 
@@ -179,15 +181,16 @@ export const generateAndGradeTarget = functions.https.onCall(async (data: any, c
           nextRefill = now + 900000;
         }
         currentStamina -= 1;
-      } else if (currentStamina === 0 && nextRefill !== null && now >= nextRefill) {
-        currentStamina = 3; // Reset to 4, then deduct 1
+      } else if (currentStamina <= 0 && nextRefill !== null && now >= nextRefill) {
+        currentStamina = 3; // Refill to 4, then deduct 1 for this attempt
         nextRefill = now + 900000;
       } else {
-        throw new functions.https.HttpsError('out-of-range', 'Not enough stamina');
+        throw new functions.https.HttpsError('out-of-range', 'Focus Stamina depleted');
       }
     }
 
-    transaction.set(userStatsRef, { focusStamina: currentStamina, nextRefill, isInfinite }, { merge: true });
+    // Overwrite with sanitized variables
+    transaction.set(userStatsRef, { focusStamina: currentStamina, nextRefill: nextRefill, isInfinite: isInfinite }, { merge: true });
     
     const attemptRef = db.collection(collectionName).doc();
     transaction.set(attemptRef, record);
@@ -250,23 +253,22 @@ export const onAttemptCreated = functions.firestore.document('{collectionId}/{at
   const incrementTotal = admin.firestore.FieldValue.increment(1);
   const incrementHits = isSuccess ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0);
 
-  const globalUpdate: any = {
-    [(new admin.firestore.FieldPath(collectionId, 'total')) as any]: incrementTotal,
-    [(new admin.firestore.FieldPath(collectionId, 'hits')) as any]: incrementHits
-  };
+  const globalUpdate: any = {};
+  const userUpdate: any = {};
 
-  const userUpdate: any = {
-    [(new admin.firestore.FieldPath(collectionId, 'total')) as any]: incrementTotal,
-    [(new admin.firestore.FieldPath(collectionId, 'hits')) as any]: incrementHits
-  };
+  globalUpdate[new admin.firestore.FieldPath(collectionId, 'total')] = incrementTotal;
+  globalUpdate[new admin.firestore.FieldPath(collectionId, 'hits')] = incrementHits;
+  
+  userUpdate[new admin.firestore.FieldPath(collectionId, 'total')] = incrementTotal;
+  userUpdate[new admin.firestore.FieldPath(collectionId, 'hits')] = incrementHits;
 
   if (collectionId === 'standardDeckAttempts' && data.guessType) {
     const guessType = data.guessType;
-    globalUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')) as any] = incrementTotal;
-    globalUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')) as any] = incrementHits;
+    globalUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')] = incrementTotal;
+    globalUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')] = incrementHits;
     
-    userUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')) as any] = incrementTotal;
-    userUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')) as any] = incrementHits;
+    userUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')] = incrementTotal;
+    userUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')] = incrementHits;
   }
 
   batch.set(globalStatsRef, globalUpdate, { merge: true });

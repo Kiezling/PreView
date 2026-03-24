@@ -61,19 +61,24 @@ export const Profile: React.FC = () => {
     const newShowAvatar = !publicProfile.showAvatar;
     setIsSavingAvatar(true);
     
-    // 1. Optimistic Update
     setOptimisticProfile({ 
-      showAvatar: newShowAvatar
+      showAvatar: newShowAvatar, 
+      photoURL: newShowAvatar ? user.photoURL : null 
     });
     
-    // 2. Background DB Write
     try {
-      await updateDoc(doc(db, 'users_public', user.uid), { 
-        showAvatar: newShowAvatar
-      });
+      // Must use setDoc with merge in case users_public/uid doesn't exist yet
+      await setDoc(doc(db, 'users_public', user.uid), { 
+        showAvatar: newShowAvatar,
+        photoURL: newShowAvatar ? user.photoURL : null
+      }, { merge: true });
     } catch (error) {
       console.error("Avatar DB Write Failed:", error);
-      setOptimisticProfile({ showAvatar: !newShowAvatar }); // Rollback on fail
+      // Rollback to original state
+      setOptimisticProfile({ 
+        showAvatar: !newShowAvatar,
+        photoURL: !newShowAvatar ? user.photoURL : null
+      }); 
     } finally {
       setIsSavingAvatar(false);
     }
