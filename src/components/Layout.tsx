@@ -110,7 +110,6 @@ export const Layout: React.FC = () => {
                 <Link to="/" className="text-3xl font-bold tracking-tight text-white hover:text-neutral-200 transition-colors">
                   PreView
                 </Link>
-                <span className="text-[10px] font-mono text-neutral-500 absolute -bottom-4 left-12">{user?.uid}</span>
               </div>
               
               {user && (
