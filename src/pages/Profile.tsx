@@ -68,11 +68,11 @@ export const Profile: React.FC = () => {
     
     // 2. Background DB Write
     try {
-      await setDoc(doc(db, 'users_public', user.uid), { 
+      await updateDoc(doc(db, 'users_public', user.uid), { 
         showAvatar: newShowAvatar
-      }, { merge: true });
+      });
     } catch (error) {
-      console.error(error);
+      console.error("Avatar DB Write Failed:", error);
       setOptimisticProfile({ showAvatar: !newShowAvatar }); // Rollback on fail
     } finally {
       setIsSavingAvatar(false);

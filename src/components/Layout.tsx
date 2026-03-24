@@ -13,7 +13,7 @@ export const Layout: React.FC = () => {
   const [targetRegenTime, setTargetRegenTime] = useState<number | null>(null);
   const [isInfinite, setIsInfinite] = useState<boolean>(false);
   const [showExhaustedModal, setShowExhaustedModal] = useState<boolean>(false);
-  const [timeLeftStr, setTimeLeftStr] = useState<string>('');
+  const [timeLeftStr, setTimeLeftStr] = useState<string>('--:--');
 
   const fetchStamina = useCallback(() => {
     if (user) {

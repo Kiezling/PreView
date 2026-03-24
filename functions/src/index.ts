@@ -166,29 +166,28 @@ export const generateAndGradeTarget = functions.https.onCall(async (data: any, c
     const userStatsRef = db.collection('userStats').doc(uid);
     const userStatsDoc = await transaction.get(userStatsRef);
     
-    let stats = userStatsDoc.data() as { focusStamina: number, nextRefill: number | null, isInfinite: boolean } | undefined;
-    
-    if (!stats) {
-      stats = { focusStamina: 4, nextRefill: null, isInfinite: false };
-    }
+    let stats = userStatsDoc.data();
+    let currentStamina = typeof stats?.focusStamina === 'number' ? stats.focusStamina : 4;
+    let nextRefill = stats?.nextRefill ?? null;
+    let isInfinite = stats?.isInfinite ?? false;
 
     const now = Date.now();
 
-    if (!stats.isInfinite) {
-      if (stats.focusStamina > 0) {
-        if (stats.focusStamina === 4) {
-          stats.nextRefill = now + 900000;
+    if (!isInfinite) {
+      if (currentStamina > 0) {
+        if (currentStamina === 4) {
+          nextRefill = now + 900000;
         }
-        stats.focusStamina -= 1;
-      } else if (stats.focusStamina === 0 && stats.nextRefill !== null && now >= stats.nextRefill) {
-        stats.focusStamina = 3; // Reset to 4, then deduct 1
-        stats.nextRefill = now + 900000;
+        currentStamina -= 1;
+      } else if (currentStamina === 0 && nextRefill !== null && now >= nextRefill) {
+        currentStamina = 3; // Reset to 4, then deduct 1
+        nextRefill = now + 900000;
       } else {
         throw new functions.https.HttpsError('out-of-range', 'Not enough stamina');
       }
     }
 
-    transaction.set(userStatsRef, stats, { merge: true });
+    transaction.set(userStatsRef, { focusStamina: currentStamina, nextRefill, isInfinite }, { merge: true });
     
     const attemptRef = db.collection(collectionName).doc();
     transaction.set(attemptRef, record);
@@ -252,22 +251,22 @@ export const onAttemptCreated = functions.firestore.document('{collectionId}/{at
   const incrementHits = isSuccess ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0);
 
   const globalUpdate: any = {
-    [`${collectionId}.total`]: incrementTotal,
-    [`${collectionId}.hits`]: incrementHits
+    [(new admin.firestore.FieldPath(collectionId, 'total')) as any]: incrementTotal,
+    [(new admin.firestore.FieldPath(collectionId, 'hits')) as any]: incrementHits
   };
 
   const userUpdate: any = {
-    [`${collectionId}.total`]: incrementTotal,
-    [`${collectionId}.hits`]: incrementHits
+    [(new admin.firestore.FieldPath(collectionId, 'total')) as any]: incrementTotal,
+    [(new admin.firestore.FieldPath(collectionId, 'hits')) as any]: incrementHits
   };
 
   if (collectionId === 'standardDeckAttempts' && data.guessType) {
     const guessType = data.guessType;
-    globalUpdate[`${collectionId}.subStats.${guessType}.total`] = incrementTotal;
-    globalUpdate[`${collectionId}.subStats.${guessType}.hits`] = incrementHits;
+    globalUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')) as any] = incrementTotal;
+    globalUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')) as any] = incrementHits;
     
-    userUpdate[`${collectionId}.subStats.${guessType}.total`] = incrementTotal;
-    userUpdate[`${collectionId}.subStats.${guessType}.hits`] = incrementHits;
+    userUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')) as any] = incrementTotal;
+    userUpdate[(new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')) as any] = incrementHits;
   }
 
   batch.set(globalStatsRef, globalUpdate, { merge: true });
