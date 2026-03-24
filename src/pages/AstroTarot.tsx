@@ -47,10 +47,6 @@ export const AstroTarot: React.FC = () => {
     if (guessType === 'Archetype') formattedGuess.archetype = selectedOption;
 
     try {
-      const getStaminaStatus = httpsCallable(functions, 'getStaminaStatus');
-      const staminaResult = await getStaminaStatus();
-      const stamina = (staminaResult.data as any).focusStamina;
-
       const generateAndGrade = httpsCallable(functions, 'generateAndGradeTarget');
       const result = await generateAndGrade({
         testType: 'AstroTarot',
@@ -67,20 +63,20 @@ export const AstroTarot: React.FC = () => {
       
       const { actualTarget, isSuccess: hit } = result.data as any;
       let actualAttr = '';
-      if (guessType === 'Energy') actualAttr = actualTarget.attributes.valence;
-      if (guessType === 'Element') actualAttr = actualTarget.attributes.element;
-      if (guessType === 'Archetype') actualAttr = actualTarget.attributes.archetype;
+      if (guessType === 'Energy') actualAttr = actualTarget?.attributes?.valence;
+      if (guessType === 'Element') actualAttr = actualTarget?.attributes?.element;
+      if (guessType === 'Archetype') actualAttr = actualTarget?.attributes?.archetype;
       
       setActualAttribute(actualAttr);
-      setActualCard(actualTarget.card);
+      setActualCard(actualTarget?.card);
       setIsSuccess(hit);
       window.dispatchEvent(new CustomEvent('staminaSpent'));
     } catch (error: any) {
       console.error("Error saving attempt:", error);
       if (error?.code === 'out-of-range' || (error instanceof Error && error.message.includes("Focus Stamina depleted"))) {
         window.dispatchEvent(new CustomEvent('staminaExhausted'));
+        setGuess(null);
       }
-      setGuess(null);
     } finally {
       setIsSubmitting(false);
     }

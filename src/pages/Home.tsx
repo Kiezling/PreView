@@ -62,40 +62,44 @@ export const Home: React.FC = () => {
         if (docSnap.exists()) {
           const data = docSnap.data();
           
-          if (data.zenerAttempts) {
-            pStats.zener.total = data.zenerAttempts.total || 0;
-            pStats.zener.success = data.zenerAttempts.hits || 0;
-          }
-          if (data.astroTarotAttempts) {
-            pStats.astroTarot.total = data.astroTarotAttempts.total || 0;
-            pStats.astroTarot.success = data.astroTarotAttempts.hits || 0;
-          }
-          if (data.stockAttempts) {
-            pStats.stock.total = data.stockAttempts.total || 0;
-            pStats.stock.success = data.stockAttempts.hits || 0;
-          }
-          if (data.colorAttempts) {
-            pStats.colorTarget.total = data.colorAttempts.total || 0;
-            pStats.colorTarget.success = data.colorAttempts.hits || 0;
-          }
-          if (data.standardDeckAttempts) {
-            pStats.standardDeck.total = data.standardDeckAttempts.total || 0;
-            pStats.standardDeck.success = data.standardDeckAttempts.hits || 0;
-            
-            if (data.standardDeckAttempts.subStats) {
-              if (data.standardDeckAttempts.subStats.color) {
-                pStats.standardDeck.subStats.color.total = data.standardDeckAttempts.subStats.color.total || 0;
-                pStats.standardDeck.subStats.color.success = data.standardDeckAttempts.subStats.color.hits || 0;
-              }
-              if (data.standardDeckAttempts.subStats.suit) {
-                pStats.standardDeck.subStats.suit.total = data.standardDeckAttempts.subStats.suit.total || 0;
-                pStats.standardDeck.subStats.suit.success = data.standardDeckAttempts.subStats.suit.hits || 0;
-              }
-              if (data.standardDeckAttempts.subStats.value) {
-                pStats.standardDeck.subStats.value.total = data.standardDeckAttempts.subStats.value.total || 0;
-                pStats.standardDeck.subStats.value.success = data.standardDeckAttempts.subStats.value.hits || 0;
+          try {
+            if (data.zenerAttempts) {
+              pStats.zener.total = data.zenerAttempts.total || 0;
+              pStats.zener.success = data.zenerAttempts.hits || 0;
+            }
+            if (data.astroTarotAttempts) {
+              pStats.astroTarot.total = data.astroTarotAttempts.total || 0;
+              pStats.astroTarot.success = data.astroTarotAttempts.hits || 0;
+            }
+            if (data.stockAttempts) {
+              pStats.stock.total = data.stockAttempts.total || 0;
+              pStats.stock.success = data.stockAttempts.hits || 0;
+            }
+            if (data.colorAttempts) {
+              pStats.colorTarget.total = data.colorAttempts.total || 0;
+              pStats.colorTarget.success = data.colorAttempts.hits || 0;
+            }
+            if (data.standardDeckAttempts) {
+              pStats.standardDeck.total = data.standardDeckAttempts.total || 0;
+              pStats.standardDeck.success = data.standardDeckAttempts.hits || 0;
+              
+              if (data.standardDeckAttempts.subStats) {
+                if (data.standardDeckAttempts.subStats.color) {
+                  pStats.standardDeck.subStats.color.total = data.standardDeckAttempts.subStats.color.total || 0;
+                  pStats.standardDeck.subStats.color.success = data.standardDeckAttempts.subStats.color.hits || 0;
+                }
+                if (data.standardDeckAttempts.subStats.suit) {
+                  pStats.standardDeck.subStats.suit.total = data.standardDeckAttempts.subStats.suit.total || 0;
+                  pStats.standardDeck.subStats.suit.success = data.standardDeckAttempts.subStats.suit.hits || 0;
+                }
+                if (data.standardDeckAttempts.subStats.value) {
+                  pStats.standardDeck.subStats.value.total = data.standardDeckAttempts.subStats.value.total || 0;
+                  pStats.standardDeck.subStats.value.success = data.standardDeckAttempts.subStats.value.hits || 0;
+                }
               }
             }
+          } catch (parseError) {
+            console.error("Error parsing personal stats data:", parseError, "Raw Data:", data);
           }
         }
       } catch (error) {
@@ -107,20 +111,6 @@ export const Home: React.FC = () => {
 
     const fetchAllStats = async () => {
       try {
-        const cachedStatsStr = sessionStorage.getItem('preview_dashboard_stats');
-        if (cachedStatsStr && isMounted) {
-          try {
-            const cachedStats = JSON.parse(cachedStatsStr);
-            if (cachedStats.timestamp && Date.now() - cachedStats.timestamp < 180000) {
-              setStats(cachedStats.data);
-              setLoading(false);
-              return;
-            }
-          } catch (e) {
-            console.error("Error parsing cached stats", e);
-          }
-        }
-
         const [personalData, globalStatsResult] = await Promise.all([
           fetchPersonalStats(user.uid),
           httpsCallable(functions, 'getGlobalStats')()
@@ -167,7 +157,6 @@ export const Home: React.FC = () => {
 
         if (isMounted) {
           setStats(newStats);
-          sessionStorage.setItem('preview_dashboard_stats', JSON.stringify({ timestamp: Date.now(), data: newStats }));
         }
       } catch (error) {
         console.error("Error fetching stats:", error);

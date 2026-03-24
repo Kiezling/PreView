@@ -184,6 +184,7 @@ export const Admin: React.FC = () => {
                   const adminManageStamina = httpsCallable(functions, 'adminManageStamina');
                   await adminManageStamina({ targetUserId: user?.uid, action: 'refill' });
                   setFocusStatusMessage({ type: 'success', text: 'Focus refilled successfully.' });
+                  window.dispatchEvent(new CustomEvent('forceStaminaSync'));
                 } catch (error: any) {
                   setFocusStatusMessage({ type: 'error', text: 'Error: ' + error.message });
                 }
@@ -199,6 +200,7 @@ export const Admin: React.FC = () => {
                   const adminManageStamina = httpsCallable(functions, 'adminManageStamina');
                   await adminManageStamina({ targetUserId: user?.uid, action: 'toggleInfinite' });
                   setFocusStatusMessage({ type: 'success', text: 'Toggled infinite focus successfully.' });
+                  window.dispatchEvent(new CustomEvent('forceStaminaSync'));
                 } catch (error: any) {
                   setFocusStatusMessage({ type: 'error', text: 'Error: ' + error.message });
                 }

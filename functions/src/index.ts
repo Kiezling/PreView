@@ -343,6 +343,10 @@ export const adminManageStamina = functions.https.onCall(async (data: any, conte
     await userStatsRef.set({ focusStamina: 4, nextRefill: null }, { merge: true });
   } else if (action === 'deplete') {
     await userStatsRef.set({ focusStamina: 0, nextRefill: Date.now() + 900000 }, { merge: true });
+  } else if (action === 'toggleInfinite') {
+    const docSnap = await userStatsRef.get();
+    const isInfinite = docSnap.data()?.isInfinite || false;
+    await userStatsRef.set({ isInfinite: !isInfinite }, { merge: true });
   } else {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid action');
   }

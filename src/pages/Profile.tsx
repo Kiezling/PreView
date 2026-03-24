@@ -63,15 +63,13 @@ export const Profile: React.FC = () => {
     
     // 1. Optimistic Update
     setOptimisticProfile({ 
-      showAvatar: newShowAvatar, 
-      photoURL: newShowAvatar ? user.photoURL : null 
+      showAvatar: newShowAvatar
     });
     
     // 2. Background DB Write
     try {
       await setDoc(doc(db, 'users_public', user.uid), { 
-        showAvatar: newShowAvatar,
-        photoURL: newShowAvatar ? user.photoURL : null
+        showAvatar: newShowAvatar
       }, { merge: true });
     } catch (error) {
       console.error(error);

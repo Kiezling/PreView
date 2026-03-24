@@ -75,6 +75,20 @@ export const Layout: React.FC = () => {
   }, [isInfinite]);
 
   useEffect(() => {
+    const handleForceSync = () => {
+      fetchStamina();
+    };
+    window.addEventListener('forceStaminaSync', handleForceSync);
+    return () => window.removeEventListener('forceStaminaSync', handleForceSync);
+  }, [fetchStamina]);
+
+  useEffect(() => {
+    if (stamina !== null && stamina > 0) {
+      setShowExhaustedModal(false);
+    }
+  }, [stamina]);
+
+  useEffect(() => {
     const interval = setInterval(() => {
       if (targetRegenTime && !isInfinite) {
         const remaining = targetRegenTime - Date.now();
@@ -88,7 +102,7 @@ export const Layout: React.FC = () => {
           setTimeLeftStr(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`);
         }
       } else {
-        setTimeLeftStr('');
+        setTimeLeftStr('--:--');
       }
     }, 1000);
     return () => clearInterval(interval);
@@ -178,7 +192,6 @@ export const Layout: React.FC = () => {
                         <UserIcon className="w-5 h-5 text-white" />
                       </div>
                     )}
-                    <span className="hidden sm:inline truncate max-w-[120px]">{publicProfile?.displayName || user.displayName || 'Profile'}</span>
                   </Link>
                   <button
                     onClick={logout}
@@ -212,12 +225,6 @@ export const Layout: React.FC = () => {
       {showExhaustedModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
           <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl text-center relative">
-            <button 
-              onClick={() => setShowExhaustedModal(false)}
-              className="absolute top-4 right-4"
-            >
-              <X className="w-6 h-6 text-white hover:text-neutral-300 transition-colors cursor-pointer" />
-            </button>
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 mb-6">
               <XCircle className="w-8 h-8 text-white" />
             </div>
@@ -225,11 +232,17 @@ export const Layout: React.FC = () => {
               Your Focus has been exhausted.
             </p>
             {!isInfinite && targetRegenTime && (
-              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4">
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 mb-6">
                 <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-1">Time until next focus point</p>
                 <p className="text-3xl font-mono text-white">{timeLeftStr}</p>
               </div>
             )}
+            <Link
+              to="/"
+              className="inline-flex items-center justify-center w-full px-6 py-3 rounded-lg text-lg font-medium bg-white hover:bg-neutral-200 text-black transition-colors"
+            >
+              Return to Dashboard
+            </Link>
           </div>
         </div>
       )}

@@ -16,7 +16,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authError, setAuthError] = useState<string | null>(null);
 
   const setOptimisticProfile = (updates: Partial<PublicProfile>) => {
-    setPublicProfile(prev => prev ? { ...prev, ...updates } : { displayName: null, photoURL: null, showAvatar: true, ...updates });
+    setPublicProfile(prev => {
+      const currentPhotoURL = prev?.photoURL || user?.photoURL || null;
+      return prev ? { ...prev, photoURL: currentPhotoURL, ...updates } : { displayName: user?.displayName || null, photoURL: currentPhotoURL, showAvatar: true, ...updates };
+    });
   };
 
   const fetchPublicProfile = async (uid: string) => {
