@@ -42,20 +42,13 @@ export const preWarmPing = functions.https.onCall(async (data: any, context: any
 });
 
 export const getMarketData = functions.https.onCall(async (data: any, context: any) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
-  }
-
-  if (data && data.ping) {
-    return { status: 'pong', timestamp: new Date().toISOString() };
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong', timestamp: new Date().toISOString() };
 
   try {
     const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=5d&interval=1d';
     const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error('Failed to fetch from Yahoo Finance');
-    }
+    if (!response.ok) throw new Error('Failed to fetch from Yahoo Finance');
     const json = await response.json();
     const meta = json.chart.result[0].meta;
     const priorClose = meta.chartPreviousClose || meta.previousClose;
@@ -67,13 +60,8 @@ export const getMarketData = functions.https.onCall(async (data: any, context: a
 });
 
 export const generateAndGradeTarget = functions.https.onCall(async (data: any, context: any) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
-  }
-
-  if (data && data.ping) {
-    return { status: 'pong', timestamp: new Date().toISOString() };
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong', timestamp: new Date().toISOString() };
 
   const { testType, guess, targetId, telemetry, guessType, targetDate } = data;
   const uid = context.auth.uid;
@@ -83,17 +71,11 @@ export const generateAndGradeTarget = functions.https.onCall(async (data: any, c
   let actualTarget: any;
   let isSuccess = false;
   let collectionName = '';
-  let record: any = {
-    userId: uid,
-    timestamp,
-    ...telemetry
-  };
-  if (targetId !== undefined) {
-    record.targetId = targetId;
-  }
+  let record: any = { userId: uid, timestamp, ...telemetry };
+  
+  if (targetId !== undefined) record.targetId = targetId;
 
   const getRandomInt = (max: number) => crypto.randomInt(0, max);
-
   let axisResults: Record<string, boolean> | undefined;
 
   if (testType === 'Zener') {
@@ -165,51 +147,37 @@ export const generateAndGradeTarget = functions.https.onCall(async (data: any, c
   await db.runTransaction(async (transaction) => {
     const userStatsRef = db.collection('userStats').doc(uid);
     const userStatsDoc = await transaction.get(userStatsRef);
-    
     let stats = userStatsDoc.data();
     
-    // Strict sanitization to prevent NaN corruption
     let currentStamina = (stats && typeof stats.focusStamina === 'number' && !isNaN(stats.focusStamina)) ? stats.focusStamina : 4;
     let nextRefill = (stats && stats.nextRefill) ? stats.nextRefill : null;
     let isInfinite = (stats && stats.isInfinite) ? stats.isInfinite : false;
-
     const now = Date.now();
 
     if (!isInfinite) {
       if (currentStamina > 0) {
-        if (currentStamina === 4) {
-          nextRefill = now + 900000;
-        }
+        if (currentStamina === 4) nextRefill = now + 900000;
         currentStamina -= 1;
       } else if (currentStamina <= 0 && nextRefill !== null && now >= nextRefill) {
-        currentStamina = 3; // Refill to 4, then deduct 1 for this attempt
+        currentStamina = 3; 
         nextRefill = now + 900000;
       } else {
         throw new functions.https.HttpsError('out-of-range', 'Focus Stamina depleted');
       }
     }
 
-    // Overwrite with sanitized variables
-    transaction.set(userStatsRef, { focusStamina: currentStamina, nextRefill: nextRefill, isInfinite: isInfinite }, { merge: true });
-    
-    const attemptRef = db.collection(collectionName).doc();
-    transaction.set(attemptRef, record);
+    transaction.set(userStatsRef, { focusStamina: currentStamina, nextRefill, isInfinite }, { merge: true });
+    transaction.set(db.collection(collectionName).doc(), record);
   });
 
   return { actualTarget, isSuccess, axisResults };
 });
 
 export const getGlobalStats = functions.https.onCall(async (data: any, context: any) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
-  }
-
-  if (data && data.ping) {
-    return { status: 'pong', timestamp: new Date().toISOString() };
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong', timestamp: new Date().toISOString() };
 
   const db = admin.firestore();
-  
   const aggregateDoc = await db.collection('globalStats').doc('aggregate').get();
   
   if (!aggregateDoc.exists) {
@@ -221,7 +189,6 @@ export const getGlobalStats = functions.https.onCall(async (data: any, context: 
       standardDeckAttempts: { total: 0, hits: 0, subStats: { color: { total: 0, hits: 0 }, suit: { total: 0, hits: 0 }, value: { total: 0, hits: 0 } } }
     };
   }
-
   return aggregateDoc.data();
 });
 
@@ -229,17 +196,10 @@ export const onAttemptCreated = functions.firestore.document('{collectionId}/{at
   const collectionId = context.params.collectionId;
   const allowedCollections = ['zenerAttempts', 'colorAttempts', 'standardDeckAttempts', 'astroTarotAttempts', 'stockAttempts'];
   
-  if (!allowedCollections.includes(collectionId)) {
-    return null;
-  }
+  if (!allowedCollections.includes(collectionId)) return null;
 
   const data = snap.data();
-
-  // STRICT BYPASS: Do not aggregate unresolved Stock attempts. 
-  // A separate CRON/onUpdate function will handle these upon market close.
-  if (collectionId === 'stockAttempts' && data.actualDirection === 'Pending') {
-    return null;
-  }
+  if (collectionId === 'stockAttempts' && data.actualDirection === 'Pending') return null;
 
   const userId = data.userId;
   const isSuccess = data.isSuccess;
@@ -253,22 +213,34 @@ export const onAttemptCreated = functions.firestore.document('{collectionId}/{at
   const incrementTotal = admin.firestore.FieldValue.increment(1);
   const incrementHits = isSuccess ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0);
 
-  const globalUpdate: any = {};
-  const userUpdate: any = {};
-
-  globalUpdate[new admin.firestore.FieldPath(collectionId, 'total')] = incrementTotal;
-  globalUpdate[new admin.firestore.FieldPath(collectionId, 'hits')] = incrementHits;
+  const globalUpdate: any = {
+    [collectionId]: {
+      total: incrementTotal,
+      hits: incrementHits
+    }
+  };
   
-  userUpdate[new admin.firestore.FieldPath(collectionId, 'total')] = incrementTotal;
-  userUpdate[new admin.firestore.FieldPath(collectionId, 'hits')] = incrementHits;
+  const userUpdate: any = {
+    [collectionId]: {
+      total: incrementTotal,
+      hits: incrementHits
+    }
+  };
 
   if (collectionId === 'standardDeckAttempts' && data.guessType) {
     const guessType = data.guessType;
-    globalUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')] = incrementTotal;
-    globalUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')] = incrementHits;
-    
-    userUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'total')] = incrementTotal;
-    userUpdate[new admin.firestore.FieldPath(collectionId, 'subStats', guessType, 'hits')] = incrementHits;
+    globalUpdate[collectionId].subStats = {
+      [guessType]: {
+        total: incrementTotal,
+        hits: incrementHits
+      }
+    };
+    userUpdate[collectionId].subStats = {
+      [guessType]: {
+        total: incrementTotal,
+        hits: incrementHits
+      }
+    };
   }
 
   batch.set(globalStatsRef, globalUpdate, { merge: true });
@@ -279,20 +251,14 @@ export const onAttemptCreated = functions.firestore.document('{collectionId}/{at
 });
 
 export const purgeUserRecords = functions.https.onCall(async (data: any, context: any) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
 
   const db = admin.firestore();
   const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-  if (callerDoc.data()?.role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Must be admin');
-  }
+  if (callerDoc.data()?.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Must be admin');
 
   const { targetUserId } = data;
-  if (!targetUserId) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
-  }
+  if (!targetUserId) throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
 
   const collectionsToPurge = ['stockAttempts'];
   let deletedCount = 0;
@@ -318,25 +284,18 @@ export const purgeUserRecords = functions.https.onCall(async (data: any, context
       await batch.commit();
     }
   }
-  
   return { success: true, deletedCount };
 });
 
 export const adminManageStamina = functions.https.onCall(async (data: any, context: any) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
 
   const db = admin.firestore();
   const callerDoc = await db.collection('users').doc(context.auth.uid).get();
-  if (callerDoc.data()?.role !== 'admin') {
-    throw new functions.https.HttpsError('permission-denied', 'Must be admin');
-  }
+  if (callerDoc.data()?.role !== 'admin') throw new functions.https.HttpsError('permission-denied', 'Must be admin');
 
   const { targetUserId, action } = data;
-  if (!targetUserId || !action) {
-    throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
-  }
+  if (!targetUserId || !action) throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
 
   const userStatsRef = db.collection('userStats').doc(targetUserId);
   
@@ -351,25 +310,17 @@ export const adminManageStamina = functions.https.onCall(async (data: any, conte
   } else {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid action');
   }
-
   return { success: true };
 });
 
 export const getStaminaStatus = functions.https.onCall(async (data: any, context: any) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
-  }
-
-  if (data && data.ping) {
-    return { status: 'pong', timestamp: new Date().toISOString() };
-  }
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong', timestamp: new Date().toISOString() };
 
   const db = admin.firestore();
   const userStatsDoc = await db.collection('userStats').doc(context.auth.uid).get();
   
-  if (!userStatsDoc.exists) {
-    return { currentStamina: 4, remainingMs: 0, isInfinite: false };
-  }
+  if (!userStatsDoc.exists) return { currentStamina: 4, remainingMs: 0, isInfinite: false };
 
   const stats = userStatsDoc.data();
   const now = Date.now();
@@ -380,15 +331,8 @@ export const getStaminaStatus = functions.https.onCall(async (data: any, context
   if (!isInfinite && currentStamina === 0 && nextRefill !== null && now >= nextRefill) {
     currentStamina = 4;
     nextRefill = null;
-    // We could update the DB here, but it's not strictly necessary for a read.
-    // The transaction in generateAndGradeTarget handles the actual reset.
   }
 
   const remainingMs = nextRefill ? Math.max(0, nextRefill - now) : 0;
-
-  return {
-    currentStamina,
-    remainingMs,
-    isInfinite
-  };
+  return { currentStamina, remainingMs, isInfinite };
 });
