@@ -71,11 +71,12 @@ export const StandardDeck: React.FC = () => {
       const { actualTarget } = result.data as any;
       setActualCard(actualTarget);
       window.dispatchEvent(new CustomEvent('staminaSpent'));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving attempt:", error);
-      if (error instanceof Error && error.message.includes("Focus Stamina depleted")) {
+      if (error?.code === 'out-of-range' || (error instanceof Error && error.message.includes("Focus Stamina depleted"))) {
         window.dispatchEvent(new CustomEvent('staminaExhausted'));
       }
+      setSelectedOption(null);
     } finally {
       setIsSubmitting(false);
     }

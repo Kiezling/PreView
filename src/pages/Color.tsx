@@ -60,11 +60,12 @@ export const ColorTarget: React.FC = () => {
       const fullColorObj = COLORS.find(c => c.name === actualTarget) || { name: actualTarget, hex: '#000000' };
       setActualColor(fullColorObj);
       window.dispatchEvent(new CustomEvent('staminaSpent'));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving attempt:", error);
-      if (error instanceof Error && error.message.includes("Focus Stamina depleted")) {
+      if (error?.code === 'out-of-range' || (error instanceof Error && error.message.includes("Focus Stamina depleted"))) {
         window.dispatchEvent(new CustomEvent('staminaExhausted'));
       }
+      setSelectedColor(null);
     } finally {
       setIsSubmitting(false);
     }

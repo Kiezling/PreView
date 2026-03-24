@@ -288,9 +288,9 @@ export const Stock: React.FC = () => {
         setAttemptState('Resolved');
       }
       window.dispatchEvent(new CustomEvent('staminaSpent'));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error saving attempt:", error);
-      if (error instanceof Error && error.message.includes("Focus Stamina depleted")) {
+      if (error?.code === 'out-of-range' || (error instanceof Error && error.message.includes("Focus Stamina depleted"))) {
         window.dispatchEvent(new CustomEvent('staminaExhausted'));
       }
     } finally {
