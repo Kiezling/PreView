@@ -28,8 +28,15 @@ export const Layout: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    const wakeServer = () => {
-      httpsCallable(functions, 'preWarmPing')().catch(() => {});
+    const wakeServer = async () => {
+      const payload = { ping: true };
+      await Promise.allSettled([
+        httpsCallable(functions, 'preWarmPing')(payload),
+        httpsCallable(functions, 'generateAndGradeTarget')(payload),
+        httpsCallable(functions, 'getGlobalStats')(payload),
+        httpsCallable(functions, 'getMarketData')(payload),
+        httpsCallable(functions, 'getStaminaStatus')(payload)
+      ]);
     };
     wakeServer(); // Fire immediately
     const heartbeat = setInterval(wakeServer, 14 * 60 * 1000); // Fire every 14 mins
