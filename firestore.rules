@@ -193,6 +193,14 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    match /userStats/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false; // Server-authoritative only
+    }
+    match /globalStats/{docId} {
+      allow read, write: if false; // Accessed strictly via Cloud Functions
+    }
+
     match /admins/{userId} {
       allow read: if isAdmin();
       allow write: if false;
