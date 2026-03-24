@@ -232,6 +232,13 @@ export const onAttemptCreated = functions.firestore.document('{collectionId}/{at
   }
 
   const data = snap.data();
+
+  // STRICT BYPASS: Do not aggregate unresolved Stock attempts. 
+  // A separate CRON/onUpdate function will handle these upon market close.
+  if (collectionId === 'stockAttempts' && data.actualDirection === 'Pending') {
+    return null;
+  }
+
   const userId = data.userId;
   const isSuccess = data.isSuccess;
   
