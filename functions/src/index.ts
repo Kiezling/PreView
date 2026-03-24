@@ -37,16 +37,16 @@ const TAROT_CARDS = [
   { name: "Ace of Pentacles", url: "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pents01.jpg", archetype: "Minor", valence: "Positive", element: "Heavy" }
 ];
 
-export const preWarmPing = functions.https.onCall(async () => {
+export const preWarmPing = functions.https.onCall(async (data: any, context: any) => {
   return { status: 'ok', timestamp: new Date().toISOString() };
 });
 
-export const getMarketData = functions.https.onCall(async (request) => {
-  if (!request.auth) {
+export const getMarketData = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  if (request.data && request.data.ping) {
+  if (data && data.ping) {
     return { status: 'pong', timestamp: new Date().toISOString() };
   }
 
@@ -56,8 +56,8 @@ export const getMarketData = functions.https.onCall(async (request) => {
     if (!response.ok) {
       throw new Error('Failed to fetch from Yahoo Finance');
     }
-    const data = await response.json();
-    const meta = data.chart.result[0].meta;
+    const json = await response.json();
+    const meta = json.chart.result[0].meta;
     const priorClose = meta.chartPreviousClose || meta.previousClose;
     return { priorClose };
   } catch (error) {
@@ -66,17 +66,17 @@ export const getMarketData = functions.https.onCall(async (request) => {
   }
 });
 
-export const generateAndGradeTarget = functions.https.onCall(async (request) => {
-  if (!request.auth) {
+export const generateAndGradeTarget = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  if (request.data && request.data.ping) {
+  if (data && data.ping) {
     return { status: 'pong', timestamp: new Date().toISOString() };
   }
 
-  const { testType, guess, targetId, telemetry, guessType, targetDate } = request.data;
-  const uid = request.auth.uid;
+  const { testType, guess, targetId, telemetry, guessType, targetDate } = data;
+  const uid = context.auth.uid;
   const db = admin.firestore();
   const timestamp = new Date().toISOString();
 
@@ -93,6 +93,8 @@ export const generateAndGradeTarget = functions.https.onCall(async (request) => 
   }
 
   const getRandomInt = (max: number) => crypto.randomInt(0, max);
+
+  let axisResults: Record<string, boolean> | undefined;
 
   if (testType === 'Zener') {
     actualTarget = ZENER_CARDS[getRandomInt(ZENER_CARDS.length)];
@@ -132,10 +134,10 @@ export const generateAndGradeTarget = functions.https.onCall(async (request) => 
     };
     actualTarget = { attributes: actualAttributes, card: randomCard };
     
-    const axisResults: Record<string, boolean> = {};
+    axisResults = {};
     Object.entries(guess).forEach(([key, value]) => {
       if (value) {
-        axisResults[key] = actualAttributes[key as keyof typeof actualAttributes] === value;
+        axisResults![key] = actualAttributes[key as keyof typeof actualAttributes] === value;
       }
     });
     
@@ -155,16 +157,47 @@ export const generateAndGradeTarget = functions.https.onCall(async (request) => 
     throw new functions.https.HttpsError('invalid-argument', 'Invalid test type');
   }
 
-  await db.collection(collectionName).add(record);
-  return { actualTarget, isSuccess, axisResults: record.axisResults };
+  await db.runTransaction(async (transaction) => {
+    const userStatsRef = db.collection('userStats').doc(uid);
+    const userStatsDoc = await transaction.get(userStatsRef);
+    
+    let stats = userStatsDoc.data() as { focusStamina: number, nextRefill: number | null, isInfinite: boolean } | undefined;
+    
+    if (!stats) {
+      stats = { focusStamina: 4, nextRefill: null, isInfinite: false };
+    }
+
+    const now = Date.now();
+
+    if (!stats.isInfinite) {
+      if (stats.focusStamina > 0) {
+        if (stats.focusStamina === 4) {
+          stats.nextRefill = now + 900000;
+        }
+        stats.focusStamina -= 1;
+      } else if (stats.focusStamina === 0 && stats.nextRefill !== null && now >= stats.nextRefill) {
+        stats.focusStamina = 3; // Reset to 4, then deduct 1
+        stats.nextRefill = now + 900000;
+      } else {
+        throw new functions.https.HttpsError('out-of-range', 'Not enough stamina');
+      }
+    }
+
+    transaction.set(userStatsRef, stats, { merge: true });
+    
+    const attemptRef = db.collection(collectionName).doc();
+    transaction.set(attemptRef, record);
+  });
+
+  return { actualTarget, isSuccess, axisResults };
 });
 
-export const getGlobalStats = functions.https.onCall(async (request) => {
-  if (!request.auth) {
+export const getGlobalStats = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  if (request.data && request.data.ping) {
+  if (data && data.ping) {
     return { status: 'pong', timestamp: new Date().toISOString() };
   }
 
@@ -194,11 +227,11 @@ export const getGlobalStats = functions.https.onCall(async (request) => {
     value: { total: 0, hits: 0 }
   };
   standardDeckSnapshot.forEach(doc => {
-    const data = doc.data();
-    if (data.isSuccess) standardDeckHits++;
-    if (data.guessType && subStats[data.guessType as keyof typeof subStats]) {
-      subStats[data.guessType as keyof typeof subStats].total++;
-      if (data.isSuccess) subStats[data.guessType as keyof typeof subStats].hits++;
+    const docData = doc.data();
+    if (docData.isSuccess) standardDeckHits++;
+    if (docData.guessType && subStats[docData.guessType as keyof typeof subStats]) {
+      subStats[docData.guessType as keyof typeof subStats].total++;
+      if (docData.isSuccess) subStats[docData.guessType as keyof typeof subStats].hits++;
     }
   });
   const standardDeckAttempts = { total: standardDeckSnapshot.size, hits: standardDeckHits, subStats };
@@ -212,61 +245,72 @@ export const getGlobalStats = functions.https.onCall(async (request) => {
   };
 });
 
-export const purgeUserRecords = functions.https.onCall(async (request) => {
-  if (!request.auth) {
+export const purgeUserRecords = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
   const db = admin.firestore();
-  const callerDoc = await db.collection('users').doc(request.auth.uid).get();
+  const callerDoc = await db.collection('users').doc(context.auth.uid).get();
   if (callerDoc.data()?.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Must be admin');
   }
 
-  const { targetUserId } = request.data;
+  const { targetUserId } = data;
   if (!targetUserId) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
   }
 
   const collectionsToPurge = ['stockAttempts'];
-  const batch = db.batch();
   let deletedCount = 0;
 
   for (const collectionName of collectionsToPurge) {
-    const snapshot = await db.collection(collectionName).where('userId', '==', targetUserId).get();
-    snapshot.docs.forEach(doc => {
-      batch.delete(doc.ref);
-      deletedCount++;
-    });
+    let hasMore = true;
+    while (hasMore) {
+      const snapshot = await db.collection(collectionName)
+        .where('userId', '==', targetUserId)
+        .limit(500)
+        .get();
+
+      if (snapshot.empty) {
+        hasMore = false;
+        break;
+      }
+
+      const batch = db.batch();
+      snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+        deletedCount++;
+      });
+      await batch.commit();
+    }
   }
   
-  await batch.commit();
-
   return { success: true, deletedCount };
 });
 
-export const adminManageStamina = functions.https.onCall(async (request) => {
-  if (!request.auth) {
+export const adminManageStamina = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
   const db = admin.firestore();
-  const callerDoc = await db.collection('users').doc(request.auth.uid).get();
+  const callerDoc = await db.collection('users').doc(context.auth.uid).get();
   if (callerDoc.data()?.role !== 'admin') {
     throw new functions.https.HttpsError('permission-denied', 'Must be admin');
   }
 
-  const { targetUserId, action } = request.data;
+  const { targetUserId, action } = data;
   if (!targetUserId || !action) {
     throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
   }
 
-  const userRef = db.collection('users').doc(targetUserId);
+  const userStatsRef = db.collection('userStats').doc(targetUserId);
   
   if (action === 'refill') {
-    await userRef.update({ focusStamina: 100 });
+    await userStatsRef.set({ focusStamina: 4, nextRefill: null }, { merge: true });
   } else if (action === 'deplete') {
-    await userRef.update({ focusStamina: 0 });
+    await userStatsRef.set({ focusStamina: 0, nextRefill: Date.now() + 900000 }, { merge: true });
   } else {
     throw new functions.https.HttpsError('invalid-argument', 'Invalid action');
   }
@@ -274,21 +318,43 @@ export const adminManageStamina = functions.https.onCall(async (request) => {
   return { success: true };
 });
 
-export const getStaminaStatus = functions.https.onCall(async (request) => {
-  if (!request.auth) {
+export const getStaminaStatus = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) {
     throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
   }
 
-  const db = admin.firestore();
-  const userDoc = await db.collection('users').doc(request.auth.uid).get();
-  
-  if (!userDoc.exists) {
-    return { focusStamina: 100, nextRefill: null };
+  if (data && data.ping) {
+    return { status: 'pong', timestamp: new Date().toISOString() };
   }
 
-  const data = userDoc.data();
+  const db = admin.firestore();
+  const userStatsDoc = await db.collection('userStats').doc(context.auth.uid).get();
+  
+  if (!userStatsDoc.exists) {
+    return { currentStamina: 4, nextRegenInMs: 0, isInfinite: false };
+  }
+
+  const stats = userStatsDoc.data();
+  const now = Date.now();
+  let currentStamina = stats?.focusStamina ?? 4;
+  let nextRefill = stats?.nextRefill ?? null;
+  const isInfinite = stats?.isInfinite ?? false;
+
+  if (!isInfinite && currentStamina === 0 && nextRefill !== null && now >= nextRefill) {
+    currentStamina = 4;
+    nextRefill = null;
+    // We could update the DB here, but it's not strictly necessary for a read.
+    // The transaction in generateAndGradeTarget handles the actual reset.
+  }
+
+  let nextRegenInMs = 0;
+  if (nextRefill !== null && currentStamina < 4) {
+    nextRegenInMs = Math.max(0, nextRefill - now);
+  }
+
   return {
-    focusStamina: data?.focusStamina ?? 100,
-    nextRefill: data?.nextRefill ?? null
+    currentStamina,
+    nextRegenInMs,
+    isInfinite
   };
 });
