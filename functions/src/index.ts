@@ -203,46 +203,66 @@ export const getGlobalStats = functions.https.onCall(async (data: any, context: 
 
   const db = admin.firestore();
   
-  const getStats = async (collectionName: string) => {
-    const snapshot = await db.collection(collectionName).get();
-    let hits = 0;
-    snapshot.forEach(doc => {
-      if (doc.data().isSuccess) hits++;
-    });
-    return { total: snapshot.size, hits };
+  const aggregateDoc = await db.collection('globalStats').doc('aggregate').get();
+  
+  if (!aggregateDoc.exists) {
+    return {
+      zenerAttempts: { total: 0, hits: 0 },
+      colorAttempts: { total: 0, hits: 0 },
+      stockAttempts: { total: 0, hits: 0 },
+      astroTarotAttempts: { total: 0, hits: 0 },
+      standardDeckAttempts: { total: 0, hits: 0, subStats: { color: { total: 0, hits: 0 }, suit: { total: 0, hits: 0 }, value: { total: 0, hits: 0 } } }
+    };
+  }
+
+  return aggregateDoc.data();
+});
+
+export const onAttemptCreated = functions.firestore.document('{collectionId}/{attemptId}').onCreate(async (snap, context) => {
+  const collectionId = context.params.collectionId;
+  const allowedCollections = ['zenerAttempts', 'colorAttempts', 'standardDeckAttempts', 'astroTarotAttempts', 'stockAttempts'];
+  
+  if (!allowedCollections.includes(collectionId)) {
+    return null;
+  }
+
+  const data = snap.data();
+  const userId = data.userId;
+  const isSuccess = data.isSuccess;
+  
+  const db = admin.firestore();
+  const batch = db.batch();
+
+  const globalStatsRef = db.collection('globalStats').doc('aggregate');
+  const userStatsRef = db.collection('userStats').doc(userId);
+
+  const incrementTotal = admin.firestore.FieldValue.increment(1);
+  const incrementHits = isSuccess ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0);
+
+  const globalUpdate: any = {
+    [`${collectionId}.total`]: incrementTotal,
+    [`${collectionId}.hits`]: incrementHits
   };
 
-  const [zenerAttempts, colorAttempts, stockAttempts, astroTarotAttempts] = await Promise.all([
-    getStats('zenerAttempts'),
-    getStats('colorAttempts'),
-    getStats('stockAttempts'),
-    getStats('astroTarotAttempts')
-  ]);
-
-  const standardDeckSnapshot = await db.collection('standardDeckAttempts').get();
-  let standardDeckHits = 0;
-  const subStats = {
-    color: { total: 0, hits: 0 },
-    suit: { total: 0, hits: 0 },
-    value: { total: 0, hits: 0 }
+  const userUpdate: any = {
+    [`${collectionId}.total`]: incrementTotal,
+    [`${collectionId}.hits`]: incrementHits
   };
-  standardDeckSnapshot.forEach(doc => {
-    const docData = doc.data();
-    if (docData.isSuccess) standardDeckHits++;
-    if (docData.guessType && subStats[docData.guessType as keyof typeof subStats]) {
-      subStats[docData.guessType as keyof typeof subStats].total++;
-      if (docData.isSuccess) subStats[docData.guessType as keyof typeof subStats].hits++;
-    }
-  });
-  const standardDeckAttempts = { total: standardDeckSnapshot.size, hits: standardDeckHits, subStats };
 
-  return {
-    zenerAttempts,
-    colorAttempts,
-    stockAttempts,
-    astroTarotAttempts,
-    standardDeckAttempts
-  };
+  if (collectionId === 'standardDeckAttempts' && data.guessType) {
+    const guessType = data.guessType;
+    globalUpdate[`${collectionId}.subStats.${guessType}.total`] = incrementTotal;
+    globalUpdate[`${collectionId}.subStats.${guessType}.hits`] = incrementHits;
+    
+    userUpdate[`${collectionId}.subStats.${guessType}.total`] = incrementTotal;
+    userUpdate[`${collectionId}.subStats.${guessType}.hits`] = incrementHits;
+  }
+
+  batch.set(globalStatsRef, globalUpdate, { merge: true });
+  batch.set(userStatsRef, userUpdate, { merge: true });
+
+  await batch.commit();
+  return null;
 });
 
 export const purgeUserRecords = functions.https.onCall(async (data: any, context: any) => {

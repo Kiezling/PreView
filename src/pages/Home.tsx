@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, Layers, TrendingUp, Palette, Spade } from 'lucide-react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
 import { useAuth } from '../components/AuthContext';
@@ -40,14 +40,6 @@ export const Home: React.FC = () => {
     let isMounted = true;
 
     const fetchPersonalStats = async (uid: string) => {
-      const modes = [
-        { key: 'zener', collection: 'zenerAttempts' },
-        { key: 'astroTarot', collection: 'astroTarotAttempts' },
-        { key: 'stock', collection: 'stockAttempts' },
-        { key: 'standardDeck', collection: 'standardDeckAttempts' },
-        { key: 'colorTarget', collection: 'colorAttempts' },
-      ];
-
       const pStats: Record<string, any> = {
         zener: { total: 0, success: 0 },
         astroTarot: { total: 0, success: 0 },
@@ -63,26 +55,53 @@ export const Home: React.FC = () => {
         colorTarget: { total: 0, success: 0 },
       };
 
-      for (const mode of modes) {
-        const q = query(
-          collection(db, mode.collection),
-          where('userId', '==', uid)
-        );
-        const snapshot = await getDocs(q);
+      try {
+        const docRef = doc(db, 'userStats', uid);
+        const docSnap = await getDoc(docRef);
 
-        snapshot.forEach(doc => {
-          const data = doc.data();
-          const isSuccess = data.isSuccess === true;
-
-          pStats[mode.key].total++;
-          if (isSuccess) pStats[mode.key].success++;
-
-          if (mode.key === 'standardDeck' && data.guessType && pStats.standardDeck.subStats[data.guessType]) {
-            pStats.standardDeck.subStats[data.guessType].total++;
-            if (isSuccess) pStats.standardDeck.subStats[data.guessType].success++;
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          
+          if (data.zenerAttempts) {
+            pStats.zener.total = data.zenerAttempts.total || 0;
+            pStats.zener.success = data.zenerAttempts.hits || 0;
           }
-        });
+          if (data.astroTarotAttempts) {
+            pStats.astroTarot.total = data.astroTarotAttempts.total || 0;
+            pStats.astroTarot.success = data.astroTarotAttempts.hits || 0;
+          }
+          if (data.stockAttempts) {
+            pStats.stock.total = data.stockAttempts.total || 0;
+            pStats.stock.success = data.stockAttempts.hits || 0;
+          }
+          if (data.colorAttempts) {
+            pStats.colorTarget.total = data.colorAttempts.total || 0;
+            pStats.colorTarget.success = data.colorAttempts.hits || 0;
+          }
+          if (data.standardDeckAttempts) {
+            pStats.standardDeck.total = data.standardDeckAttempts.total || 0;
+            pStats.standardDeck.success = data.standardDeckAttempts.hits || 0;
+            
+            if (data.standardDeckAttempts.subStats) {
+              if (data.standardDeckAttempts.subStats.color) {
+                pStats.standardDeck.subStats.color.total = data.standardDeckAttempts.subStats.color.total || 0;
+                pStats.standardDeck.subStats.color.success = data.standardDeckAttempts.subStats.color.hits || 0;
+              }
+              if (data.standardDeckAttempts.subStats.suit) {
+                pStats.standardDeck.subStats.suit.total = data.standardDeckAttempts.subStats.suit.total || 0;
+                pStats.standardDeck.subStats.suit.success = data.standardDeckAttempts.subStats.suit.hits || 0;
+              }
+              if (data.standardDeckAttempts.subStats.value) {
+                pStats.standardDeck.subStats.value.total = data.standardDeckAttempts.subStats.value.total || 0;
+                pStats.standardDeck.subStats.value.success = data.standardDeckAttempts.subStats.value.hits || 0;
+              }
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching personal stats:", error);
       }
+
       return pStats;
     };
 
