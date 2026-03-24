@@ -23,10 +23,11 @@ export function getDeviceType() {
 }
 
 export function generateTargetId() {
-  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+  const chars = Math.random().toString(36).substring(2, 5).toUpperCase();
+  const now = new Date();
+  const month = now.getMonth() + 1;
+  const day = now.getDate();
+  return `${chars} ${month}.${day}`;
 }
 
 export function playAuditoryTarget(category: string, polarity: string) {

@@ -215,6 +215,7 @@ export const StandardDeck: React.FC = () => {
                 </div>
 
                 <div className="flex items-center gap-4 mb-10 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
+                  <span className="text-sm text-neutral-500 uppercase tracking-wider font-semibold mr-2">Accuracy:</span>
                   {((guessType === 'color' && selectedOption === actualCard?.color) ||
                     (guessType === 'suit' && selectedOption === actualCard?.suit) ||
                     (guessType === 'value' && selectedOption === actualCard?.value)) ? (

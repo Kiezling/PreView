@@ -30,9 +30,6 @@ export const Layout: React.FC = () => {
     if (!user) return;
     const wakeServer = () => {
       httpsCallable(functions, 'preWarmPing')().catch(() => {});
-      httpsCallable(functions, 'getMarketData')({ ping: true }).catch(() => {});
-      httpsCallable(functions, 'generateAndGradeTarget')({ ping: true }).catch(() => {});
-      httpsCallable(functions, 'getGlobalStats')({ ping: true }).catch(() => {});
     };
     wakeServer(); // Fire immediately
     const heartbeat = setInterval(wakeServer, 14 * 60 * 1000); // Fire every 14 mins
@@ -96,7 +93,6 @@ export const Layout: React.FC = () => {
     { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
     { name: 'Astro-Tarot', path: '/astro-tarot', icon: Layers },
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
-    { name: 'Admin', path: '/admin', icon: Shield },
   ];
 
   const isMaxFocus = stamina === 4 || isInfinite;

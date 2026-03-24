@@ -162,16 +162,8 @@ export const Zener: React.FC = () => {
             </div>
 
             <div className="flex flex-wrap items-center justify-center gap-6 mb-10 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
-              <div className="text-center">
-                <p className="text-sm text-neutral-500 mb-2 uppercase tracking-wider font-semibold">You Selected</p>
-                <p className="text-xl font-bold text-white flex items-center justify-center gap-2">
-                  {selectedCard}
-                </p>
-              </div>
-              
-              <div className="hidden sm:block w-px h-16 bg-neutral-800 mx-2"></div>
-              
               <div className="flex items-center gap-3">
+                <span className="text-sm text-neutral-500 uppercase tracking-wider font-semibold mr-2">Accuracy:</span>
                 {selectedCard === actualCard ? (
                   <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
                 ) : (

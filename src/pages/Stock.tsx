@@ -498,6 +498,7 @@ export const Stock: React.FC = () => {
             </div>
 
             <div className="flex items-center gap-3 mb-8 bg-neutral-900/80 px-8 py-5 rounded-2xl border border-neutral-800 shadow-inner">
+              <span className="text-sm text-neutral-500 uppercase tracking-wider font-semibold mr-2">Accuracy:</span>
               {selectedDirection === actualDirection ? (
                 <span className="text-3xl font-bold text-white tracking-widest uppercase">Hit</span>
               ) : (
