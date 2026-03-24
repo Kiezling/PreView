@@ -106,13 +106,14 @@ export const Layout: React.FC = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 relative">
                 <Link to="/admin" className="hover:opacity-80 transition-opacity">
                   <Brain className="w-8 h-8 text-white" />
                 </Link>
                 <Link to="/" className="text-3xl font-bold tracking-tight text-white hover:text-neutral-200 transition-colors">
                   PreView
                 </Link>
+                <span className="text-[10px] font-mono text-neutral-500 absolute -bottom-4 left-12">{user?.uid}</span>
               </div>
               
               {user && (

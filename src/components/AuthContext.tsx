@@ -91,21 +91,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (!userSnap.exists()) {
               await setDoc(userRef, {
                 uid: currentUser.uid,
-                email: currentUser.email,
-                displayName: currentUser.displayName,
-                photoURL: currentUser.photoURL,
+                email: currentUser.email || null,
+                displayName: currentUser.displayName || null,
+                photoURL: currentUser.photoURL || null,
                 createdAt: new Date().toISOString(),
               });
             }
             await setDoc(publicRef, {
               uid: currentUser.uid,
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
+              displayName: currentUser.displayName || null,
+              photoURL: currentUser.photoURL || null,
               showAvatar: true,
             });
             setPublicProfile({
-              displayName: currentUser.displayName,
-              photoURL: currentUser.photoURL,
+              displayName: currentUser.displayName || null,
+              photoURL: currentUser.photoURL || null,
               showAvatar: true,
             });
           }
@@ -129,7 +129,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await signInWithPopup(auth, googleProvider);
     } catch (error: any) {
       if (error.code === 'auth/popup-closed-by-user') {
-        // User closed the popup, ignore
         return;
       }
       console.error("Login failed:", error);
