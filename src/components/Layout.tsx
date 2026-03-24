@@ -20,7 +20,7 @@ export const Layout: React.FC = () => {
       httpsCallable(functions, 'getStaminaStatus')().then(res => {
         const data = res.data as any;
         setStamina(data.currentStamina);
-        setTargetRegenTime(Date.now() + data.nextRegenInMs);
+        setTargetRegenTime(Date.now() + data.remainingMs);
         setIsInfinite(data.isInfinite || false);
       }).catch(() => {});
     }

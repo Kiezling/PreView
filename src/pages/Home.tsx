@@ -107,10 +107,18 @@ export const Home: React.FC = () => {
 
     const fetchAllStats = async () => {
       try {
-        const cachedStats = sessionStorage.getItem('preview_dashboard_stats');
-        if (cachedStats && isMounted) {
-          setStats(JSON.parse(cachedStats));
-          setLoading(false);
+        const cachedStatsStr = sessionStorage.getItem('preview_dashboard_stats');
+        if (cachedStatsStr && isMounted) {
+          try {
+            const cachedStats = JSON.parse(cachedStatsStr);
+            if (cachedStats.timestamp && Date.now() - cachedStats.timestamp < 180000) {
+              setStats(cachedStats.data);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {
+            console.error("Error parsing cached stats", e);
+          }
         }
 
         const [personalData, globalStatsResult] = await Promise.all([
@@ -159,7 +167,7 @@ export const Home: React.FC = () => {
 
         if (isMounted) {
           setStats(newStats);
-          sessionStorage.setItem('preview_dashboard_stats', JSON.stringify(newStats));
+          sessionStorage.setItem('preview_dashboard_stats', JSON.stringify({ timestamp: Date.now(), data: newStats }));
         }
       } catch (error) {
         console.error("Error fetching stats:", error);

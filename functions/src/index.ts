@@ -367,14 +367,11 @@ export const getStaminaStatus = functions.https.onCall(async (data: any, context
     // The transaction in generateAndGradeTarget handles the actual reset.
   }
 
-  let nextRegenInMs = 0;
-  if (nextRefill !== null && currentStamina < 4) {
-    nextRegenInMs = Math.max(0, nextRefill - now);
-  }
+  const remainingMs = nextRefill ? Math.max(0, nextRefill - now) : 0;
 
   return {
     currentStamina,
-    nextRegenInMs,
+    remainingMs,
     isInfinite
   };
 });
