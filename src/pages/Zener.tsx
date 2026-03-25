@@ -132,7 +132,7 @@ export const Zener: React.FC = () => {
         </div>
 
         {/* Card Selection */}
-        {stamina === 0 && !isInfinite ? (
+        {stamina === 0 && !isInfinite && !actualCard ? (
           <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 text-center mt-8">
             <p className="text-neutral-500 uppercase tracking-widest text-sm font-semibold mb-2">Time until next focus point</p>
             <p className="text-4xl font-mono text-white">{timeLeftStr}</p>

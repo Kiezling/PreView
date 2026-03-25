@@ -53,8 +53,8 @@ export const Layout: React.FC = () => {
       setStamina(prev => {
         if (prev === null || isInfinite) return prev;
         const newStamina = Math.max(0, prev - 1);
-        if (prev === 4) {
-          setTargetRegenTime(Date.now() + 15 * 60 * 1000);
+        if (prev === 3) {
+          setTargetRegenTime(Date.now() + 60 * 60 * 1000);
         }
         return newStamina;
       });
@@ -104,7 +104,7 @@ export const Layout: React.FC = () => {
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
   ];
 
-  const isMaxFocus = stamina === 4 || isInfinite;
+  const isMaxFocus = stamina === 3 || isInfinite;
 
   return (
     <div className="min-h-screen bg-neutral-950 text-neutral-100 font-sans selection:bg-white/30">
@@ -152,11 +152,11 @@ export const Layout: React.FC = () => {
               ) : user ? (
                 <>
                   {stamina !== null && (
-                    <div className={`flex flex-col items-center justify-center relative group ${isMaxFocus ? 'cursor-default' : 'cursor-help'}`}>
+                    <div className={`flex flex-col items-center justify-center relative group cursor-default`}>
                       <span className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold mb-[4px]">Focus</span>
-                      <div className="relative flex items-center border-2 border-neutral-600 rounded-[4px] p-[2px] gap-[2px] w-16 h-[20px]">
+                      <div className="relative flex items-center border-2 border-neutral-600 rounded-[4px] p-[2px] gap-[2px] w-12 h-[20px]">
                         <div className="absolute -right-[5px] w-[3px] h-[8px] bg-neutral-600 rounded-r-[2px]"></div>
-                        {[1, 2, 3, 4].map((i) => (
+                        {[1, 2, 3].map((i) => (
                           <div key={i} className={`flex-1 h-full rounded-[2px] transition-colors duration-300 ${isInfinite || stamina >= i ? 'bg-white' : 'bg-neutral-800'}`}></div>
                         ))}
                         {isInfinite && (

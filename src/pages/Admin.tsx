@@ -4,7 +4,7 @@ import { useAuth } from '../components/AuthContext';
 import { db, functions } from '../firebase';
 import { collection, getDocs, doc, getDoc, writeBatch } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
-import { ShieldAlert, Database, Users, Activity, Loader2, CheckCircle2, XCircle, Zap } from 'lucide-react';
+import { ShieldAlert, Database, Users, Activity, Loader2, CheckCircle2, XCircle, Zap, RefreshCw } from 'lucide-react';
 import { useOutletContext } from 'react-router-dom';
 
 export const Admin: React.FC = () => {
@@ -21,8 +21,8 @@ export const Admin: React.FC = () => {
         return;
       }
       try {
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        if (userDoc.exists() && userDoc.data().role === 'admin') {
+        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+        if (adminDoc.exists()) {
           setIsAdmin(true);
         } else {
           setIsAdmin(false);
@@ -138,10 +138,15 @@ export const Admin: React.FC = () => {
             <button
               onClick={handleToggleInfiniteFocus}
               disabled={isSubmitting}
-              className={`w-full py-3 px-4 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 border-2 ${isInfinite ? 'bg-white text-black border-white hover:bg-neutral-200' : 'bg-transparent text-white border-neutral-700 hover:border-white'}`}
+              className={`w-full py-3 px-4 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-between gap-2 border-2 ${isInfinite ? 'bg-white text-black border-white hover:bg-neutral-200' : 'bg-transparent text-white border-neutral-700 hover:border-white'}`}
             >
-              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className={`w-5 h-5 ${isInfinite ? 'fill-current' : ''}`} />}
-              {isInfinite ? 'Infinite Focus: ON' : 'Infinite Focus: OFF'}
+              <div className="flex items-center gap-2">
+                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Zap className={`w-5 h-5 ${isInfinite ? 'fill-current' : ''}`} />}
+                <span>Infinite Focus</span>
+              </div>
+              <div className={`w-11 h-6 rounded-full transition-colors flex items-center px-1 ${isInfinite ? 'bg-black' : 'bg-neutral-600'}`}>
+                <div className={`w-4 h-4 rounded-full bg-white transition-transform ${isInfinite ? 'translate-x-5' : 'translate-x-0'}`} />
+              </div>
             </button>
           </div>
         </div>
