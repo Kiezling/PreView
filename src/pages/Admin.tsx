@@ -43,8 +43,7 @@ export const Admin: React.FC = () => {
         const adminDoc = await getDoc(doc(db, 'admins', user.uid));
         if (adminDoc.exists()) {
           setIsAdmin(true);
-          setTargetUserId(user.uid); // Default to self
-          // Fetch user list
+          setTargetUserId(user.uid);
           const fetchUsers = httpsCallable(functions, 'adminGetUsers');
           const res = await fetchUsers();
           setUserList(res.data as UserRecord[]);
@@ -77,7 +76,7 @@ export const Admin: React.FC = () => {
     }
   };
 
-  const handleFocusAction = async (action: 'refill' | 'deplete') => {
+  const handleFocusAction = async (action: 'refill' | 'deplete' | 'toggleInfinite') => {
     if (!targetUserId) {
       setFocusStatusMessage({ type: 'error', text: "Target UID required." });
       return;
@@ -86,7 +85,10 @@ export const Admin: React.FC = () => {
     setFocusStatusMessage(null);
     try {
       await httpsCallable(functions, 'adminManageStamina')({ targetUserId, action });
-      setFocusStatusMessage({ type: 'success', text: `Successfully ${action === 'refill' ? 'refilled' : 'depleted'} focus.` });
+      const actionText = action === 'refill' ? 'refilled' : action === 'deplete' ? 'depleted' : 'toggled infinite';
+      setFocusStatusMessage({ type: 'success', text: `Successfully ${actionText} focus.` });
+      
+      // If the admin targeted themselves, force sync the nav bar immediately
       if (targetUserId === user?.uid) {
         window.dispatchEvent(new CustomEvent('forceStaminaSync'));
       }
@@ -100,13 +102,13 @@ export const Admin: React.FC = () => {
   const handleToggleInfiniteFocus = async () => {
     setIsToggling(true);
     const newValue = !localIsInfinite;
-    setLocalIsInfinite(newValue); // Optimistic UI update
+    setLocalIsInfinite(newValue);
     
     try {
       await httpsCallable(functions, 'adminManageStamina')({ targetUserId: user!.uid, action: 'toggleInfinite' });
       window.dispatchEvent(new CustomEvent('forceStaminaSync'));
     } catch (error) {
-      setLocalIsInfinite(!newValue); // Rollback on error
+      setLocalIsInfinite(!newValue);
       console.error("Failed to toggle infinite focus");
     } finally {
       setIsToggling(false);
@@ -220,20 +222,27 @@ export const Admin: React.FC = () => {
               <p className="text-xs text-neutral-600 mt-2 font-mono">UID: {targetUserId || 'None selected'}</p>
             </div>
             
-            <div className="flex gap-4">
+            <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => handleFocusAction('refill')}
                 disabled={isManagingFocus || !targetUserId}
-                className="flex-1 py-3 px-4 flex items-center justify-center bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isManagingFocus ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Refill (Max)'}
               </button>
               <button
                 onClick={() => handleFocusAction('deplete')}
                 disabled={isManagingFocus || !targetUserId}
-                className="flex-1 py-3 px-4 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl transition-colors border border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl transition-colors border border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Deplete (Zero)
+              </button>
+              <button
+                onClick={() => handleFocusAction('toggleInfinite')}
+                disabled={isManagingFocus || !targetUserId}
+                className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-purple-900/20 hover:bg-purple-900/40 text-purple-400 font-semibold rounded-xl transition-colors border border-purple-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Toggle Infinite
               </button>
             </div>
           </div>
@@ -256,16 +265,19 @@ export const Admin: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
             <div className="md:col-span-6">
               <label className="block text-sm font-medium text-neutral-300 mb-2">Target User</label>
-              <select
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
-                >
-                  <option value="" disabled>Select a user...</option>
-                  {userList.map(u => (
-                    <option key={u.uid} value={u.uid}>{u.email}</option>
-                  ))}
-              </select>
+              <div className="relative">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
+                <select
+                    value={targetUserId}
+                    onChange={(e) => setTargetUserId(e.target.value)}
+                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
+                  >
+                    <option value="" disabled>Select a user...</option>
+                    {userList.map(u => (
+                      <option key={u.uid} value={u.uid}>{u.email}</option>
+                    ))}
+                </select>
+              </div>
             </div>
             
             <div className="md:col-span-4">
@@ -276,7 +288,11 @@ export const Admin: React.FC = () => {
                 className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
               >
                 <option value="All">All Attempts</option>
-                <option value="stockAttempts">Stock Strategy Only</option>
+                <option value="zenerAttempts">Zener Cards</option>
+                <option value="colorAttempts">Color Target</option>
+                <option value="standardDeckAttempts">Standard Deck</option>
+                <option value="astroTarotAttempts">Astro-Tarot</option>
+                <option value="stockAttempts">Stock Strategy</option>
               </select>
             </div>
 
