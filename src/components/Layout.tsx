@@ -12,7 +12,6 @@ export const Layout: React.FC = () => {
   const [stamina, setStamina] = useState<number | null>(null);
   const [targetRegenTime, setTargetRegenTime] = useState<number | null>(null);
   const [isInfinite, setIsInfinite] = useState<boolean>(false);
-  const [showExhaustedModal, setShowExhaustedModal] = useState<boolean>(false);
   const [timeLeftStr, setTimeLeftStr] = useState<string>('--:--');
 
   const fetchStamina = useCallback(() => {
@@ -61,16 +60,10 @@ export const Layout: React.FC = () => {
       });
     };
 
-    const handleStaminaExhausted = () => {
-      setShowExhaustedModal(true);
-    };
-
     window.addEventListener('staminaSpent', handleStaminaSpent);
-    window.addEventListener('staminaExhausted', handleStaminaExhausted);
 
     return () => {
       window.removeEventListener('staminaSpent', handleStaminaSpent);
-      window.removeEventListener('staminaExhausted', handleStaminaExhausted);
     };
   }, [isInfinite]);
 
@@ -81,12 +74,6 @@ export const Layout: React.FC = () => {
     window.addEventListener('forceStaminaSync', handleForceSync);
     return () => window.removeEventListener('forceStaminaSync', handleForceSync);
   }, [fetchStamina]);
-
-  useEffect(() => {
-    if (stamina !== null && stamina > 0) {
-      setShowExhaustedModal(false);
-    }
-  }, [stamina]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -222,31 +209,6 @@ export const Layout: React.FC = () => {
         </div>
       )}
 
-      {showExhaustedModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-8 max-w-md w-full shadow-2xl text-center relative">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 mb-6">
-              <XCircle className="w-8 h-8 text-white" />
-            </div>
-            <p className="text-xl font-bold text-white mb-6">
-              Your Focus has been exhausted.
-            </p>
-            {!isInfinite && targetRegenTime && (
-              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 mb-6">
-                <p className="text-sm text-neutral-500 uppercase tracking-widest font-semibold mb-1">Time until next focus point</p>
-                <p className="text-3xl font-mono text-white">{timeLeftStr}</p>
-              </div>
-            )}
-            <Link
-              to="/"
-              className="inline-flex items-center justify-center w-full px-6 py-3 rounded-lg text-lg font-medium bg-white hover:bg-neutral-200 text-black transition-colors"
-            >
-              Return to Dashboard
-            </Link>
-          </div>
-        </div>
-      )}
-
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
@@ -254,7 +216,7 @@ export const Layout: React.FC = () => {
             <p className="text-neutral-400">Verifying authentication...</p>
           </div>
         ) : user ? (
-          <Outlet />
+          <Outlet context={{ stamina, isInfinite, targetRegenTime, timeLeftStr }} />
         ) : (
           <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
             <Brain className="w-24 h-24 text-white/50 mb-6" />

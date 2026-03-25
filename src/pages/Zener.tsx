@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useOutletContext } from 'react-router-dom';
 import { Star, RefreshCw, CheckCircle2, XCircle, Circle, Plus, Waves, Square, Star as StarIcon } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -33,6 +34,7 @@ const ZenerIcon = ({ card, className, isColored }: { card: string, className?: s
 
 export const Zener: React.FC = () => {
   const { user } = useAuth();
+  const { stamina, isInfinite, timeLeftStr } = useOutletContext<{ stamina: number | null, isInfinite: boolean, timeLeftStr: string }>();
   const [targetId, setTargetId] = useState(() => generateTargetId());
   const [selectedCard, setSelectedCard] = useState<string | null>(null);
   const [actualCard, setActualCard] = useState<string | null>(null);
@@ -129,7 +131,12 @@ export const Zener: React.FC = () => {
         </div>
 
         {/* Card Selection */}
-        {!selectedCard ? (
+        {stamina === 0 && !isInfinite ? (
+          <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 text-center mt-8">
+            <p className="text-neutral-500 uppercase tracking-widest text-sm font-semibold mb-2">Time until next focus point</p>
+            <p className="text-4xl font-mono text-white">{timeLeftStr}</p>
+          </div>
+        ) : !selectedCard ? (
           <div>
             <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">

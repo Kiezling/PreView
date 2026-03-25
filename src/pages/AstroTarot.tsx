@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useOutletContext } from 'react-router-dom';
 import { Layers, RefreshCw, CheckCircle2, XCircle, ArrowLeft } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -14,6 +15,7 @@ const CATEGORIES = {
 
 export const AstroTarot: React.FC = () => {
   const { user } = useAuth();
+  const { stamina, isInfinite, timeLeftStr } = useOutletContext<{ stamina: number | null, isInfinite: boolean, timeLeftStr: string }>();
   const [targetId, setTargetId] = useState(() => generateTargetId());
   
   const [guessType, setGuessType] = useState<string | null>(null);
@@ -158,7 +160,12 @@ export const AstroTarot: React.FC = () => {
               </div>
             </div>
 
-            {!guess ? (
+            {stamina === 0 && !isInfinite ? (
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 text-center mt-8">
+                <p className="text-neutral-500 uppercase tracking-widest text-sm font-semibold mb-2">Time until next focus point</p>
+                <p className="text-4xl font-mono text-white">{timeLeftStr}</p>
+              </div>
+            ) : !guess ? (
               <div>
                 <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
                 <div className="flex flex-wrap justify-center gap-4">

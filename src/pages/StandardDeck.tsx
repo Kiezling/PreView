@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
+import { useOutletContext } from 'react-router-dom';
 import { Spade, RefreshCw, ArrowLeft } from 'lucide-react';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -20,6 +21,7 @@ interface Card {
 
 export const StandardDeck: React.FC = () => {
   const { user } = useAuth();
+  const { stamina, isInfinite, timeLeftStr } = useOutletContext<{ stamina: number | null, isInfinite: boolean, timeLeftStr: string }>();
   const [guessType, setGuessType] = useState<GuessType | null>(null);
   const [targetId, setTargetId] = useState('');
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -172,7 +174,12 @@ export const StandardDeck: React.FC = () => {
               </div>
             </div>
 
-            {!selectedOption ? (
+            {stamina === 0 && !isInfinite ? (
+              <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 text-center mt-8">
+                <p className="text-neutral-500 uppercase tracking-widest text-sm font-semibold mb-2">Time until next focus point</p>
+                <p className="text-4xl font-mono text-white">{timeLeftStr}</p>
+              </div>
+            ) : !selectedOption ? (
               <div>
                 <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
                 <div className="flex flex-wrap justify-center gap-4">

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
+import { useOutletContext } from 'react-router-dom';
 import { TrendingUp, RefreshCw, ArrowUpCircle, ArrowDownCircle, Undo, Redo, Eraser, Trash2, Loader2 } from 'lucide-react';
 import { collection, query, where, getDocs, limit } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -30,6 +31,7 @@ const getNextTradingDay = (date: Date) => {
 
 export const Stock: React.FC = () => {
   const { user } = useAuth();
+  const { stamina, isInfinite, timeLeftStr } = useOutletContext<{ stamina: number | null, isInfinite: boolean, timeLeftStr: string }>();
   const [targetDate, setTargetDate] = useState<Date>(() => {
     return getNextTradingDay(new Date());
   });
@@ -427,46 +429,55 @@ export const Stock: React.FC = () => {
                 </div>
 
                 {/* Higher / Lower Buttons */}
-                <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleSelect('Higher')}
-                    disabled={isSubmitting}
-                    className={`flex flex-col items-center gap-4 p-6 rounded-2xl border-2 bg-neutral-900 transition-colors group
-                      ${pendingDirection === 'Higher' ? 'border-white ring-4 ring-white/50' : 'border-neutral-800 hover:border-white'}
-                      ${pendingDirection === 'Lower' ? 'opacity-50' : 'opacity-100'}
-                    `}
-                  >
-                    <div className="w-full aspect-video rounded-xl overflow-hidden border border-neutral-800">
-                      {images.higher && <img src={images.higher} alt="Higher" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />}
-                    </div>
-                    <div className="flex items-center gap-2 text-xl font-bold text-white group-hover:text-white">
-                      {pendingDirection === 'Higher' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowUpCircle className="w-6 h-6" />}
-                      HIGHER
-                    </div>
-                  </motion.button>
+                {stamina === 0 && !isInfinite ? (
+                  <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-8 text-center mt-8">
+                    <p className="text-neutral-500 uppercase tracking-widest text-sm font-semibold mb-2">Time until next focus point</p>
+                    <p className="text-4xl font-mono text-white">{timeLeftStr}</p>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-xs text-neutral-500 uppercase tracking-widest text-center mb-6">Making a selection will expend 1 Focus.</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleSelect('Higher')}
+                        disabled={isSubmitting}
+                        className={`flex flex-col items-center gap-4 p-6 rounded-2xl border-2 bg-neutral-900 transition-colors group
+                          ${pendingDirection === 'Higher' ? 'border-white ring-4 ring-white/50' : 'border-neutral-800 hover:border-white'}
+                          ${pendingDirection === 'Lower' ? 'opacity-50' : 'opacity-100'}
+                        `}
+                      >
+                        <div className="w-full aspect-video rounded-xl overflow-hidden border border-neutral-800">
+                          {images.higher && <img src={images.higher} alt="Higher" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />}
+                        </div>
+                        <div className="flex items-center gap-2 text-xl font-bold text-white group-hover:text-white">
+                          {pendingDirection === 'Higher' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowUpCircle className="w-6 h-6" />}
+                          HIGHER
+                        </div>
+                      </motion.button>
 
-                  <motion.button
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => handleSelect('Lower')}
-                    disabled={isSubmitting}
-                    className={`flex flex-col items-center gap-4 p-6 rounded-2xl border-2 bg-neutral-900 transition-colors group
-                      ${pendingDirection === 'Lower' ? 'border-white ring-4 ring-white/50' : 'border-neutral-800 hover:border-white'}
-                      ${pendingDirection === 'Higher' ? 'opacity-50' : 'opacity-100'}
-                    `}
-                  >
-                    <div className="w-full aspect-video rounded-xl overflow-hidden border border-neutral-800">
-                      {images.lower && <img src={images.lower} alt="Lower" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />}
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={() => handleSelect('Lower')}
+                        disabled={isSubmitting}
+                        className={`flex flex-col items-center gap-4 p-6 rounded-2xl border-2 bg-neutral-900 transition-colors group
+                          ${pendingDirection === 'Lower' ? 'border-white ring-4 ring-white/50' : 'border-neutral-800 hover:border-white'}
+                          ${pendingDirection === 'Higher' ? 'opacity-50' : 'opacity-100'}
+                        `}
+                      >
+                        <div className="w-full aspect-video rounded-xl overflow-hidden border border-neutral-800">
+                          {images.lower && <img src={images.lower} alt="Lower" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" referrerPolicy="no-referrer" />}
+                        </div>
+                        <div className="flex items-center gap-2 text-xl font-bold text-white group-hover:text-white">
+                          {pendingDirection === 'Lower' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowDownCircle className="w-6 h-6" />}
+                          LOWER
+                        </div>
+                      </motion.button>
                     </div>
-                    <div className="flex items-center gap-2 text-xl font-bold text-white group-hover:text-white">
-                      {pendingDirection === 'Lower' ? <Loader2 className="w-6 h-6 animate-spin" /> : <ArrowDownCircle className="w-6 h-6" />}
-                      LOWER
-                    </div>
-                  </motion.button>
-                </div>
+                  </>
+                )}
               </>
             )}
           </>
