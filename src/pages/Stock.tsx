@@ -1,3 +1,4 @@
+// src/pages/Stock.tsx
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { useOutletContext } from 'react-router-dom';

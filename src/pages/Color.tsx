@@ -1,3 +1,4 @@
+// src/pages/Color.tsx
 import React, { useState, useRef, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useOutletContext } from 'react-router-dom';
