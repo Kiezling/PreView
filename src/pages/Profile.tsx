@@ -89,7 +89,7 @@ export const Profile: React.FC = () => {
 
     const fetchUserStats = async () => {
       try {
-        const collections = ['zenerAttempts', 'colorAttempts', 'astroTarotAttempts', 'standardDeckAttempts'];
+        const collections = ['zenerAttempts', 'colorAttempts', 'astroTarotAttempts', 'standardDeckAttempts', 'stockAttempts'];
         let allAttempts: any[] = [];
 
         for (const col of collections) {
@@ -115,11 +115,11 @@ export const Profile: React.FC = () => {
 
   const getChronobiologyData = () => {
     const filtered = attempts.filter(a => {
-      if (filterMode === 'Zener') return a.testType === 'Zener';
-      if (filterMode === 'Color') return a.testType === 'Color';
-      if (filterMode === 'Stock') return a.testType === 'Stock';
-      if (filterMode.startsWith('Deck:')) return a.testType === 'StandardDeck' && a.guessType?.toLowerCase() === filterMode.split(': ')[1].toLowerCase();
-      if (filterMode.startsWith('Tarot:')) return a.testType === 'AstroTarot' && a.guessType === filterMode.split(': ')[1];
+      if (filterMode === 'Zener') return a.mode === 'zener';
+      if (filterMode === 'Color') return a.mode === 'color';
+      if (filterMode === 'Stock') return a.mode === 'stock';
+      if (filterMode.startsWith('Deck:')) return a.mode === 'standardDeck' && a.guessType?.toLowerCase() === filterMode.split(': ')[1].toLowerCase();
+      if (filterMode.startsWith('Tarot:')) return a.mode === 'astroTarot';
       return true;
     });
     
@@ -133,6 +133,7 @@ export const Profile: React.FC = () => {
     ];
 
     filtered.forEach(attempt => {
+      if (!attempt.timestamp) return;
       const hour = new Date(attempt.timestamp).getHours();
       const bucketIndex = Math.floor(hour / 4);
       if (buckets[bucketIndex]) {
@@ -152,16 +153,21 @@ export const Profile: React.FC = () => {
 
   const formatAttemptData = (a: any) => {
     let guess = 'N/A', actual = 'N/A';
-    if (a.testType === 'Zener') { guess = a.selectedCard; actual = a.actualCard; }
-    else if (a.testType === 'Color') { guess = a.selectedColor; actual = a.actualColor; }
-    else if (a.testType === 'Stock') { guess = a.selectedDirection; actual = a.actualDirection; }
-    else if (a.testType === 'StandardDeck') { 
+    if (a.mode === 'zener') { 
+      guess = a.selectedCard; 
+      actual = a.actualCard; 
+    } else if (a.mode === 'color') { 
+      guess = a.selectedColor?.name || a.selectedColor; 
+      actual = a.actualColor?.name || a.actualColor; 
+    } else if (a.mode === 'stock') { 
+      guess = a.selectedDirection; 
+      actual = a.actualDirection; 
+    } else if (a.mode === 'standardDeck') { 
       guess = a.selectedOption; 
       actual = a.actualCard ? `${a.actualCard.value} of ${a.actualCard.suit}` : 'N/A'; 
-    }
-    else if (a.testType === 'AstroTarot') { 
-      guess = a.selectedAttributes ? Object.values(a.selectedAttributes)[0] as string : 'N/A'; 
-      actual = a.actualAttributes ? Object.values(a.actualAttributes)[0] as string : 'N/A'; 
+    } else if (a.mode === 'astroTarot') { 
+      guess = a.selectedAttributes ? Object.values(a.selectedAttributes).filter(Boolean).join(', ') : 'N/A'; 
+      actual = a.actualAttributes ? Object.values(a.actualAttributes).join(', ') : 'N/A'; 
     }
     return { guess: String(guess || 'N/A'), actual: String(actual || 'N/A') };
   };

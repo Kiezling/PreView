@@ -98,10 +98,10 @@ export const Layout: React.FC = () => {
   const navItems = [
     { name: 'Dashboard', path: '/', icon: LayoutDashboard },
     { name: 'Zener Cards', path: '/zener', icon: Star },
-    { name: 'Color Target', path: '/color', icon: Palette },
-    { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
     { name: 'Astro-Tarot', path: '/astro-tarot', icon: Layers },
     { name: 'Stock Strategy', path: '/stock', icon: TrendingUp },
+    { name: 'Standard Deck', path: '/standard-deck', icon: Spade },
+    { name: 'Color Target', path: '/color', icon: Palette },
   ];
 
   const isMaxFocus = stamina === 3 || isInfinite;
