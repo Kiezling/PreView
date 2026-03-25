@@ -26,9 +26,12 @@ export const Admin: React.FC = () => {
   const [isManagingFocus, setIsManagingFocus] = useState(false);
   const [isPurging, setIsPurging] = useState(false);
 
-  // Scrubber/Focus State
-  const [targetUserId, setTargetUserId] = useState<string>('');
+  // Separated Target States (Safety Fix)
+  const [focusUserId, setFocusUserId] = useState<string>('');
+  const [purgeUserId, setPurgeUserId] = useState<string>('');
   const [moduleName, setModuleName] = useState<string>('All');
+  
+  // Status Messages
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [focusStatusMessage, setFocusStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -44,7 +47,7 @@ export const Admin: React.FC = () => {
         const adminDoc = await getDoc(doc(db, 'admins', user.uid));
         if (adminDoc.exists()) {
           setIsAdmin(true);
-          setTargetUserId(user.uid);
+          setFocusUserId(user.uid);
           const fetchUsers = httpsCallable(functions, 'adminGetUsers');
           const res = await fetchUsers();
           setUserList(res.data as UserRecord[]);
@@ -60,16 +63,16 @@ export const Admin: React.FC = () => {
   }, [user]);
 
   const executePurge = async () => {
-    if (!targetUserId) return;
+    if (!purgeUserId) return;
     setIsPurging(true);
     setStatusMessage(null);
     setShowConfirm(false);
 
     try {
       const purgeFunc = httpsCallable(functions, 'purgeUserRecords');
-      const result = await purgeFunc({ targetUserId, moduleName });
+      const result = await purgeFunc({ targetUserId: purgeUserId, moduleName });
       const data = result.data as any;
-      setStatusMessage({ type: 'success', text: `Successfully purged ${data.deletedCount} records for user ${targetUserId}.` });
+      setStatusMessage({ type: 'success', text: `Successfully purged ${data.deletedCount} records for user ${purgeUserId}.` });
     } catch (error: any) {
       setStatusMessage({ type: 'error', text: error.message || "Failed to purge records." });
     } finally {
@@ -78,18 +81,18 @@ export const Admin: React.FC = () => {
   };
 
   const handleFocusAction = async (action: 'refill' | 'deplete' | 'toggleInfinite') => {
-    if (!targetUserId) {
+    if (!focusUserId) {
       setFocusStatusMessage({ type: 'error', text: "Target UID required." });
       return;
     }
     setIsManagingFocus(true);
     setFocusStatusMessage(null);
     try {
-      await httpsCallable(functions, 'adminManageStamina')({ targetUserId, action });
+      await httpsCallable(functions, 'adminManageStamina')({ targetUserId: focusUserId, action });
       const actionText = action === 'refill' ? 'refilled' : action === 'deplete' ? 'depleted' : 'toggled infinite';
       setFocusStatusMessage({ type: 'success', text: `Successfully ${actionText} focus.` });
       
-      if (targetUserId === user?.uid) {
+      if (focusUserId === user?.uid) {
         window.dispatchEvent(new CustomEvent('forceStaminaSync'));
       }
     } catch (error: any) {
@@ -230,8 +233,8 @@ export const Admin: React.FC = () => {
               <div className="relative">
                 <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
                 <select
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
+                  value={focusUserId}
+                  onChange={(e) => setFocusUserId(e.target.value)}
                   className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
                 >
                   <option value="" disabled>Select a user...</option>
@@ -242,27 +245,27 @@ export const Admin: React.FC = () => {
                   ))}
                 </select>
               </div>
-              <p className="text-xs text-neutral-600 mt-2 font-mono">UID: {targetUserId || 'None selected'}</p>
+              <p className="text-xs text-neutral-600 mt-2 font-mono">UID: {focusUserId || 'None selected'}</p>
             </div>
             
             <div className="flex flex-wrap gap-4">
               <button
                 onClick={() => handleFocusAction('refill')}
-                disabled={isManagingFocus || !targetUserId}
+                disabled={isManagingFocus || !focusUserId}
                 className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isManagingFocus ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Refill (Max)'}
               </button>
               <button
                 onClick={() => handleFocusAction('deplete')}
-                disabled={isManagingFocus || !targetUserId}
+                disabled={isManagingFocus || !focusUserId}
                 className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl transition-colors border border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Deplete (Zero)
               </button>
               <button
                 onClick={() => handleFocusAction('toggleInfinite')}
-                disabled={isManagingFocus || !targetUserId}
+                disabled={isManagingFocus || !focusUserId}
                 className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-purple-900/20 hover:bg-purple-900/40 text-purple-400 font-semibold rounded-xl transition-colors border border-purple-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Toggle Infinite
@@ -291,8 +294,8 @@ export const Admin: React.FC = () => {
               <div className="relative">
                 <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
                 <select
-                    value={targetUserId}
-                    onChange={(e) => setTargetUserId(e.target.value)}
+                    value={purgeUserId}
+                    onChange={(e) => setPurgeUserId(e.target.value)}
                     className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
                   >
                     <option value="" disabled>Select a user...</option>
@@ -322,7 +325,7 @@ export const Admin: React.FC = () => {
             <div className="md:col-span-2">
               <button
                 onClick={() => setShowConfirm(true)}
-                disabled={isPurging || !targetUserId}
+                disabled={isPurging || !purgeUserId}
                 className="w-full py-3 px-4 flex items-center justify-center bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900/50 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Purge Data
