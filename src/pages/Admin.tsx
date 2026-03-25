@@ -4,18 +4,30 @@ import { useOutletContext } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
-import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, TrendingUp, RefreshCw, Zap } from 'lucide-react';
+import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, Zap, RefreshCw, Users } from 'lucide-react';
+
+interface UserRecord {
+  uid: string;
+  email: string;
+  displayName: string;
+}
 
 export const Admin: React.FC = () => {
   const { user } = useAuth();
   const { isInfinite } = useOutletContext<{ isInfinite: boolean }>();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
   const [localIsInfinite, setLocalIsInfinite] = useState<boolean>(isInfinite);
+  const [userList, setUserList] = useState<UserRecord[]>([]);
 
-  // Scrubber State
+  // Isolated Loading States
+  const [isToggling, setIsToggling] = useState(false);
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [isManagingFocus, setIsManagingFocus] = useState(false);
+  const [isPurging, setIsPurging] = useState(false);
+
+  // Scrubber/Focus State
   const [targetUserId, setTargetUserId] = useState<string>('');
   const [moduleName, setModuleName] = useState<string>('All');
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [focusStatusMessage, setFocusStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -25,22 +37,31 @@ export const Admin: React.FC = () => {
   }, [isInfinite]);
 
   useEffect(() => {
-    const checkAdmin = async () => {
+    const initializeAdmin = async () => {
       if (!user) { setIsAdmin(false); return; }
       try {
         const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-        setIsAdmin(adminDoc.exists());
+        if (adminDoc.exists()) {
+          setIsAdmin(true);
+          setTargetUserId(user.uid); // Default to self
+          // Fetch user list
+          const fetchUsers = httpsCallable(functions, 'adminGetUsers');
+          const res = await fetchUsers();
+          setUserList(res.data as UserRecord[]);
+        } else {
+          setIsAdmin(false);
+        }
       } catch (error) {
         console.error("Error checking admin status:", error);
         setIsAdmin(false);
       }
     };
-    checkAdmin();
+    initializeAdmin();
   }, [user]);
 
   const executePurge = async () => {
     if (!targetUserId) return;
-    setIsSubmitting(true);
+    setIsPurging(true);
     setStatusMessage(null);
     setShowConfirm(false);
 
@@ -49,12 +70,10 @@ export const Admin: React.FC = () => {
       const result = await purgeFunc({ targetUserId, moduleName });
       const data = result.data as any;
       setStatusMessage({ type: 'success', text: `Successfully purged ${data.deletedCount} records for user ${targetUserId}.` });
-      setTargetUserId('');
     } catch (error: any) {
-      console.error("Purge Error:", error);
       setStatusMessage({ type: 'error', text: error.message || "Failed to purge records." });
     } finally {
-      setIsSubmitting(false);
+      setIsPurging(false);
     }
   };
 
@@ -63,44 +82,47 @@ export const Admin: React.FC = () => {
       setFocusStatusMessage({ type: 'error', text: "Target UID required." });
       return;
     }
-    setIsSubmitting(true);
+    setIsManagingFocus(true);
     setFocusStatusMessage(null);
     try {
       await httpsCallable(functions, 'adminManageStamina')({ targetUserId, action });
       setFocusStatusMessage({ type: 'success', text: `Successfully ${action === 'refill' ? 'refilled' : 'depleted'} focus.` });
-      window.dispatchEvent(new CustomEvent('forceStaminaSync'));
+      if (targetUserId === user?.uid) {
+        window.dispatchEvent(new CustomEvent('forceStaminaSync'));
+      }
     } catch (error: any) {
       setFocusStatusMessage({ type: 'error', text: error.message || "Failed to manage focus." });
     } finally {
-      setIsSubmitting(false);
+      setIsManagingFocus(false);
     }
   };
 
   const handleToggleInfiniteFocus = async () => {
-    setIsSubmitting(true);
+    setIsToggling(true);
     const newValue = !localIsInfinite;
     setLocalIsInfinite(newValue); // Optimistic UI update
     
     try {
       await httpsCallable(functions, 'adminManageStamina')({ targetUserId: user!.uid, action: 'toggleInfinite' });
-      setStatusMessage({ type: 'success', text: `Infinite focus has been ${newValue ? 'ENABLED' : 'DISABLED'}.` });
       window.dispatchEvent(new CustomEvent('forceStaminaSync'));
     } catch (error) {
       setLocalIsInfinite(!newValue); // Rollback on error
-      setStatusMessage({ type: 'error', text: "Failed to toggle infinite focus." });
+      console.error("Failed to toggle infinite focus");
+    } finally {
+      setIsToggling(false);
     }
-    setIsSubmitting(false);
   };
 
   const handleRecalculateStats = async () => {
-    setIsSubmitting(true);
+    setIsRecalculating(true);
     try {
       await httpsCallable(functions, 'recalculatePersonalStats')();
       setStatusMessage({ type: 'success', text: "Successfully recalculated historical stats." });
     } catch (error) {
       setStatusMessage({ type: 'error', text: "Failed to recalculate stats." });
+    } finally {
+      setIsRecalculating(false);
     }
-    setIsSubmitting(false);
   };
 
   if (isAdmin === null) {
@@ -123,7 +145,7 @@ export const Admin: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto">
+    <div className="max-w-5xl mx-auto pb-12">
       <header className="mb-12">
         <h1 className="text-4xl font-bold tracking-tight text-white mb-2">System Administration</h1>
         <p className="text-neutral-400 text-lg">Manage global state, user records, and database integrity.</p>
@@ -145,7 +167,7 @@ export const Admin: React.FC = () => {
               </div>
               <button
                 onClick={handleToggleInfiniteFocus}
-                disabled={isSubmitting}
+                disabled={isToggling}
                 className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 ${localIsInfinite ? 'bg-white' : 'bg-neutral-700'}`}
               >
                 <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${localIsInfinite ? 'translate-x-7 bg-black' : 'translate-x-0 bg-white'}`} />
@@ -154,10 +176,10 @@ export const Admin: React.FC = () => {
 
             <button
               onClick={handleRecalculateStats}
-              disabled={isSubmitting}
+              disabled={isRecalculating}
               className="w-full py-4 px-4 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-neutral-800 text-white hover:bg-neutral-700 border border-neutral-700"
             >
-              {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+              {isRecalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
               Recalculate Personal Stats
             </button>
           </div>
@@ -175,32 +197,41 @@ export const Admin: React.FC = () => {
             <BatteryMedium className="w-6 h-6 text-white" />
             <h2 className="text-2xl font-bold text-white">Focus Management</h2>
           </div>
-          <p className="text-neutral-400 text-sm mb-6">Manually adjust a user's stamina points.</p>
+          <p className="text-neutral-400 text-sm mb-6">Select a user to manually adjust their stamina points.</p>
           
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Target User ID</label>
-              <input
-                type="text"
-                value={targetUserId}
-                onChange={(e) => setTargetUserId(e.target.value)}
-                placeholder="Enter exact Firebase UID..."
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all font-mono text-sm"
-              />
+              <label className="block text-sm font-medium text-neutral-300 mb-2">Target User</label>
+              <div className="relative">
+                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
+                <select
+                  value={targetUserId}
+                  onChange={(e) => setTargetUserId(e.target.value)}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
+                >
+                  <option value="" disabled>Select a user...</option>
+                  {userList.map(u => (
+                    <option key={u.uid} value={u.uid}>
+                      {u.email} {u.uid === user?.uid ? '(You)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-neutral-600 mt-2 font-mono">UID: {targetUserId || 'None selected'}</p>
             </div>
             
             <div className="flex gap-4">
               <button
                 onClick={() => handleFocusAction('refill')}
-                disabled={isSubmitting || !targetUserId}
-                className="flex-1 py-3 px-4 bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isManagingFocus || !targetUserId}
+                className="flex-1 py-3 px-4 flex items-center justify-center bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Refill (Max)
+                {isManagingFocus ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Refill (Max)'}
               </button>
               <button
                 onClick={() => handleFocusAction('deplete')}
-                disabled={isSubmitting || !targetUserId}
-                className="flex-1 py-3 px-4 bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl transition-colors border border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isManagingFocus || !targetUserId}
+                className="flex-1 py-3 px-4 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl transition-colors border border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Deplete (Zero)
               </button>
@@ -224,14 +255,17 @@ export const Admin: React.FC = () => {
           
           <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
             <div className="md:col-span-6">
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Target User ID</label>
-              <input
-                type="text"
-                value={targetUserId}
-                onChange={(e) => setTargetUserId(e.target.value)}
-                placeholder="Enter exact Firebase UID..."
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all font-mono text-sm"
-              />
+              <label className="block text-sm font-medium text-neutral-300 mb-2">Target User</label>
+              <select
+                  value={targetUserId}
+                  onChange={(e) => setTargetUserId(e.target.value)}
+                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
+                >
+                  <option value="" disabled>Select a user...</option>
+                  {userList.map(u => (
+                    <option key={u.uid} value={u.uid}>{u.email}</option>
+                  ))}
+              </select>
             </div>
             
             <div className="md:col-span-4">
@@ -249,8 +283,8 @@ export const Admin: React.FC = () => {
             <div className="md:col-span-2">
               <button
                 onClick={() => setShowConfirm(true)}
-                disabled={isSubmitting || !targetUserId}
-                className="w-full py-3 px-4 bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900/50 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isPurging || !targetUserId}
+                className="w-full py-3 px-4 flex items-center justify-center bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900/50 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Purge Data
               </button>
@@ -268,7 +302,7 @@ export const Admin: React.FC = () => {
               <h3 className="text-xl font-bold">Confirm Purge</h3>
             </div>
             <p className="text-neutral-300 mb-6">
-              Are you absolutely sure you want to purge <strong>{moduleName}</strong> records for user <strong>{targetUserId}</strong>? This action cannot be undone.
+              Are you absolutely sure you want to purge <strong>{moduleName}</strong> records for this user? This action cannot be undone.
             </p>
             <div className="flex gap-4 justify-end">
               <button 
@@ -281,7 +315,7 @@ export const Admin: React.FC = () => {
                 onClick={executePurge}
                 className="px-4 py-2 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center gap-2"
               >
-                {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {isPurging ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Execute Purge
               </button>
             </div>
