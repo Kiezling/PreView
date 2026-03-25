@@ -1,343 +1,296 @@
-import React, { useState, useEffect } from 'react';
-import { useAuth } from '../components/AuthContext';
-import { useOutletContext } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
-import { httpsCallable } from 'firebase/functions';
-import { db, functions } from '../firebase';
-import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, Zap, RefreshCw, Users } from 'lucide-react';
+import * as functions from 'firebase-functions/v1';
+import * as admin from 'firebase-admin';
+import * as crypto from 'crypto';
 
-interface UserRecord {
-  uid: string;
-  email: string;
-  displayName: string;
-}
+admin.initializeApp();
 
-export const Admin: React.FC = () => {
-  const { user } = useAuth();
-  const { isInfinite } = useOutletContext<{ isInfinite: boolean }>();
-  const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
-  const [localIsInfinite, setLocalIsInfinite] = useState<boolean>(isInfinite);
-  const [userList, setUserList] = useState<UserRecord[]>([]);
+const ZENER_CARDS = ['Circle', 'Cross', 'Waves', 'Square', 'Star'];
+const COLORS = ['Red', 'Orange', 'Yellow', 'Green', 'Blue', 'Violet'];
+const SUITS = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
+const VALUES = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+const TAROT_CARDS = [
+  { name: "The Fool", url: "https://upload.wikimedia.org/wikipedia/commons/9/90/RWS_Tarot_00_Fool.jpg", archetype: "Major", valence: "Positive", element: "Sharp" },
+  { name: "The Magician", url: "https://upload.wikimedia.org/wikipedia/commons/d/de/RWS_Tarot_01_Magician.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "The High Priestess", url: "https://upload.wikimedia.org/wikipedia/commons/8/88/RWS_Tarot_02_High_Priestess.jpg", archetype: "Major", valence: "Positive", element: "Cold" },
+  { name: "The Empress", url: "https://upload.wikimedia.org/wikipedia/commons/d/d2/RWS_Tarot_03_Empress.jpg", archetype: "Major", valence: "Positive", element: "Heavy" },
+  { name: "The Emperor", url: "https://upload.wikimedia.org/wikipedia/commons/c/c3/RWS_Tarot_04_Emperor.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "The Hierophant", url: "https://upload.wikimedia.org/wikipedia/commons/8/8d/RWS_Tarot_05_Hierophant.jpg", archetype: "Major", valence: "Positive", element: "Heavy" },
+  { name: "The Lovers", url: "https://upload.wikimedia.org/wikipedia/commons/3/3a/TheLovers.jpg", archetype: "Major", valence: "Positive", element: "Sharp" },
+  { name: "The Chariot", url: "https://upload.wikimedia.org/wikipedia/commons/9/9b/RWS_Tarot_07_Chariot.jpg", archetype: "Major", valence: "Positive", element: "Cold" },
+  { name: "Strength", url: "https://upload.wikimedia.org/wikipedia/commons/f/f5/RWS_Tarot_08_Strength.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "The Hermit", url: "https://upload.wikimedia.org/wikipedia/commons/4/4d/RWS_Tarot_09_Hermit.jpg", archetype: "Major", valence: "Negative", element: "Heavy" },
+  { name: "Wheel of Fortune", url: "https://upload.wikimedia.org/wikipedia/commons/3/3c/RWS_Tarot_10_Wheel_of_Fortune.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "Justice", url: "https://upload.wikimedia.org/wikipedia/commons/e/e0/RWS_Tarot_11_Justice.jpg", archetype: "Major", valence: "Positive", element: "Sharp" },
+  { name: "The Hanged Man", url: "https://upload.wikimedia.org/wikipedia/commons/2/2b/RWS_Tarot_12_Hanged_Man.jpg", archetype: "Major", valence: "Negative", element: "Cold" },
+  { name: "Death", url: "https://upload.wikimedia.org/wikipedia/commons/d/d7/RWS_Tarot_13_Death.jpg", archetype: "Major", valence: "Negative", element: "Cold" },
+  { name: "Temperance", url: "https://upload.wikimedia.org/wikipedia/commons/f/f8/RWS_Tarot_14_Temperance.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "The Devil", url: "https://upload.wikimedia.org/wikipedia/commons/5/55/RWS_Tarot_15_Devil.jpg", archetype: "Major", valence: "Negative", element: "Heavy" },
+  { name: "The Tower", url: "https://upload.wikimedia.org/wikipedia/commons/5/53/RWS_Tarot_16_Tower.jpg", archetype: "Major", valence: "Negative", element: "Hot" },
+  { name: "The Star", url: "https://upload.wikimedia.org/wikipedia/commons/c/cd/RWS_Tarot_17_Star.jpg", archetype: "Major", valence: "Positive", element: "Sharp" },
+  { name: "The Moon", url: "https://upload.wikimedia.org/wikipedia/commons/7/7f/RWS_Tarot_18_Moon.jpg", archetype: "Major", valence: "Negative", element: "Cold" },
+  { name: "The Sun", url: "https://upload.wikimedia.org/wikipedia/commons/1/17/RWS_Tarot_19_Sun.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "Judgement", url: "https://upload.wikimedia.org/wikipedia/commons/d/dd/RWS_Tarot_20_Judgment.jpg", archetype: "Major", valence: "Positive", element: "Hot" },
+  { name: "The World", url: "https://upload.wikimedia.org/wikipedia/commons/f/ff/RWS_Tarot_21_World.jpg", archetype: "Major", valence: "Positive", element: "Heavy" },
+  { name: "Ace of Wands", url: "https://upload.wikimedia.org/wikipedia/commons/1/11/Wands01.jpg", archetype: "Minor", valence: "Positive", element: "Hot" },
+  { name: "Ace of Cups", url: "https://upload.wikimedia.org/wikipedia/commons/3/36/Cups01.jpg", archetype: "Minor", valence: "Positive", element: "Cold" },
+  { name: "Ace of Swords", url: "https://upload.wikimedia.org/wikipedia/commons/1/1a/Swords01.jpg", archetype: "Minor", valence: "Negative", element: "Sharp" },
+  { name: "Ace of Pentacles", url: "https://upload.wikimedia.org/wikipedia/commons/f/fd/Pents01.jpg", archetype: "Minor", valence: "Positive", element: "Heavy" }
+];
 
-  // Isolated Loading States
-  const [isToggling, setIsToggling] = useState(false);
-  const [isRecalculating, setIsRecalculating] = useState(false);
-  const [isManagingFocus, setIsManagingFocus] = useState(false);
-  const [isPurging, setIsPurging] = useState(false);
+export const preWarmPing = functions.https.onCall(async (data: any, context: any) => { return { status: 'ok' }; });
 
-  // Scrubber/Focus State
-  const [targetUserId, setTargetUserId] = useState<string>('');
-  const [moduleName, setModuleName] = useState<string>('All');
-  const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [focusStatusMessage, setFocusStatusMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
-  const [showConfirm, setShowConfirm] = useState(false);
+export const getMarketData = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong' };
+  try {
+    const url = 'https://query1.finance.yahoo.com/v8/finance/chart/^GSPC?range=5d&interval=1d';
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Failed to fetch from Yahoo Finance');
+    const json = await response.json();
+    const meta = json.chart.result[0].meta;
+    const priorClose = meta.chartPreviousClose || meta.previousClose;
+    return { priorClose };
+  } catch (error) { throw new functions.https.HttpsError('internal', 'Failed to fetch market data'); }
+});
 
-  useEffect(() => {
-    setLocalIsInfinite(isInfinite);
-  }, [isInfinite]);
+export const generateAndGradeTarget = functions.runWith({ minInstances: 1 }).https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong' };
 
-  useEffect(() => {
-    const initializeAdmin = async () => {
-      if (!user) { setIsAdmin(false); return; }
-      try {
-        const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-        if (adminDoc.exists()) {
-          setIsAdmin(true);
-          setTargetUserId(user.uid);
-          const fetchUsers = httpsCallable(functions, 'adminGetUsers');
-          const res = await fetchUsers();
-          setUserList(res.data as UserRecord[]);
-        } else {
-          setIsAdmin(false);
-        }
-      } catch (error) {
-        console.error("Error checking admin status:", error);
-        setIsAdmin(false);
-      }
-    };
-    initializeAdmin();
-  }, [user]);
+  const { testType, guess, targetId, telemetry, guessType, targetDate } = data;
+  const uid = context.auth.uid;
+  const db = admin.firestore();
+  const timestamp = new Date().toISOString();
 
-  const executePurge = async () => {
-    if (!targetUserId) return;
-    setIsPurging(true);
-    setStatusMessage(null);
-    setShowConfirm(false);
+  let actualTarget: any; let isSuccess = false; let collectionName = ''; let record: any = { userId: uid, timestamp, ...telemetry };
+  if (targetId !== undefined) record.targetId = targetId;
+  const getRandomInt = (max: number) => crypto.randomInt(0, max);
+  let axisResults: Record<string, boolean> | undefined;
 
-    try {
-      const purgeFunc = httpsCallable(functions, 'purgeUserRecords');
-      const result = await purgeFunc({ targetUserId, moduleName });
-      const data = result.data as any;
-      setStatusMessage({ type: 'success', text: `Successfully purged ${data.deletedCount} records for user ${targetUserId}.` });
-    } catch (error: any) {
-      setStatusMessage({ type: 'error', text: error.message || "Failed to purge records." });
-    } finally {
-      setIsPurging(false);
-    }
-  };
+  if (testType === 'Zener') { actualTarget = ZENER_CARDS[getRandomInt(ZENER_CARDS.length)]; isSuccess = guess === actualTarget; collectionName = 'zenerAttempts'; record.selectedCard = guess; record.actualCard = actualTarget; record.isSuccess = isSuccess; } 
+  else if (testType === 'Color') { actualTarget = COLORS[getRandomInt(COLORS.length)]; isSuccess = guess === actualTarget; collectionName = 'colorAttempts'; record.selectedColor = guess; record.actualColor = actualTarget; record.isSuccess = isSuccess; } 
+  else if (testType === 'StandardDeck') { const randomSuit = SUITS[getRandomInt(SUITS.length)]; const randomValue = VALUES[getRandomInt(VALUES.length)]; const randomColor = ['Hearts', 'Diamonds'].includes(randomSuit) ? 'Red' : 'Black'; actualTarget = { suit: randomSuit, value: randomValue, color: randomColor }; if (guessType === 'color') isSuccess = guess === randomColor; if (guessType === 'suit') isSuccess = guess === randomSuit; if (guessType === 'value') isSuccess = guess === randomValue; collectionName = 'standardDeckAttempts'; record.guessType = guessType; record.selectedOption = guess; record.actualCard = actualTarget; record.isSuccess = isSuccess; } 
+  else if (testType === 'AstroTarot') { const randomCard = TAROT_CARDS[getRandomInt(TAROT_CARDS.length)]; const actualAttributes = { valence: randomCard.valence, element: randomCard.element, archetype: randomCard.archetype }; actualTarget = { attributes: actualAttributes, card: randomCard }; axisResults = {}; let hitCount = 0; Object.entries(guess).forEach(([key, value]) => { if (value) { const hit = actualAttributes[key as keyof typeof actualAttributes] === value; axisResults![key] = hit; if (hit) hitCount++; } }); isSuccess = hitCount > 0; collectionName = 'astroTarotAttempts'; record.selectedAttributes = guess; record.actualAttributes = actualAttributes; record.axisResults = axisResults; record.isSuccess = isSuccess; } 
+  else if (testType === 'Stock') { actualTarget = 'Pending'; isSuccess = false; collectionName = 'stockAttempts'; record.targetDate = targetDate; record.selectedDirection = guess; record.actualDirection = actualTarget; record.isSuccess = isSuccess; } 
+  else { throw new functions.https.HttpsError('invalid-argument', 'Invalid test type'); }
 
-  const handleFocusAction = async (action: 'refill' | 'deplete' | 'toggleInfinite') => {
-    if (!targetUserId) {
-      setFocusStatusMessage({ type: 'error', text: "Target UID required." });
-      return;
-    }
-    setIsManagingFocus(true);
-    setFocusStatusMessage(null);
-    try {
-      await httpsCallable(functions, 'adminManageStamina')({ targetUserId, action });
-      const actionText = action === 'refill' ? 'refilled' : action === 'deplete' ? 'depleted' : 'toggled infinite';
-      setFocusStatusMessage({ type: 'success', text: `Successfully ${actionText} focus.` });
-      
-      // If the admin targeted themselves, force sync the nav bar immediately
-      if (targetUserId === user?.uid) {
-        window.dispatchEvent(new CustomEvent('forceStaminaSync'));
-      }
-    } catch (error: any) {
-      setFocusStatusMessage({ type: 'error', text: error.message || "Failed to manage focus." });
-    } finally {
-      setIsManagingFocus(false);
-    }
-  };
-
-  const handleToggleInfiniteFocus = async () => {
-    setIsToggling(true);
-    const newValue = !localIsInfinite;
-    setLocalIsInfinite(newValue);
+  await db.runTransaction(async (transaction) => {
+    const userStatsRef = db.collection('userStats').doc(uid);
+    const userStatsDoc = await transaction.get(userStatsRef);
+    let stats = userStatsDoc.data();
     
-    try {
-      await httpsCallable(functions, 'adminManageStamina')({ targetUserId: user!.uid, action: 'toggleInfinite' });
-      window.dispatchEvent(new CustomEvent('forceStaminaSync'));
-    } catch (error) {
-      setLocalIsInfinite(!newValue);
-      console.error("Failed to toggle infinite focus");
-    } finally {
-      setIsToggling(false);
-    }
-  };
+    let currentStamina = (stats && typeof stats.focusStamina === 'number' && !isNaN(stats.focusStamina)) ? stats.focusStamina : 3;
+    let nextRefill = (stats && stats.nextRefill) ? stats.nextRefill : null;
+    let isInfinite = (stats && stats.isInfinite) ? stats.isInfinite : false;
+    const now = Date.now();
 
-  const handleRecalculateStats = async () => {
-    setIsRecalculating(true);
-    try {
-      await httpsCallable(functions, 'recalculatePersonalStats')();
-      setStatusMessage({ type: 'success', text: "Successfully recalculated historical stats." });
-    } catch (error) {
-      setStatusMessage({ type: 'error', text: "Failed to recalculate stats." });
-    } finally {
-      setIsRecalculating(false);
+    if (!isInfinite) {
+      if (currentStamina > 0) {
+        if (currentStamina === 3) nextRefill = now + 3600000;
+        currentStamina -= 1;
+      } else if (currentStamina <= 0 && nextRefill !== null && now >= nextRefill) {
+        currentStamina = 2; nextRefill = now + 3600000;
+      } else { throw new functions.https.HttpsError('out-of-range', 'Focus Stamina depleted'); }
     }
-  };
+    transaction.set(userStatsRef, { focusStamina: currentStamina, nextRefill, isInfinite }, { merge: true });
+    transaction.set(db.collection(collectionName).doc(), record);
+  });
+  return { actualTarget, isSuccess, axisResults };
+});
 
-  if (isAdmin === null) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <Loader2 className="w-12 h-12 text-white animate-spin mb-4" />
-        <p className="text-neutral-400">Verifying credentials...</p>
-      </div>
-    );
+export const getGlobalStats = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong' };
+  const db = admin.firestore();
+  const aggregateDoc = await db.collection('globalStats').doc('aggregate').get();
+  if (!aggregateDoc.exists) { return { zenerAttempts: { total: 0, hits: 0 }, colorAttempts: { total: 0, hits: 0 }, stockAttempts: { total: 0, hits: 0 }, astroTarotAttempts: { total: 0, hits: 0 }, standardDeckAttempts: { total: 0, hits: 0, subStats: { color: { total: 0, hits: 0 }, suit: { total: 0, hits: 0 }, value: { total: 0, hits: 0 } } } }; }
+  return aggregateDoc.data();
+});
+
+export const onAttemptCreated = functions.firestore.document('{collectionId}/{attemptId}').onCreate(async (snap, context) => {
+  const collectionId = context.params.collectionId;
+  const allowedCollections = ['zenerAttempts', 'colorAttempts', 'standardDeckAttempts', 'astroTarotAttempts', 'stockAttempts'];
+  if (!allowedCollections.includes(collectionId)) return null;
+
+  const data = snap.data();
+  if (collectionId === 'stockAttempts' && data.actualDirection === 'Pending') return null;
+
+  const userId = data.userId; const isSuccess = data.isSuccess;
+  const db = admin.firestore(); const batch = db.batch();
+
+  const globalStatsRef = db.collection('globalStats').doc('aggregate');
+  const userStatsRef = db.collection('userStats').doc(userId);
+
+  const incrementTotal = admin.firestore.FieldValue.increment(1);
+  const incrementHits = isSuccess ? admin.firestore.FieldValue.increment(1) : admin.firestore.FieldValue.increment(0);
+
+  const globalUpdate: any = { [collectionId]: { total: incrementTotal, hits: incrementHits } };
+  const userUpdate: any = { [collectionId]: { total: incrementTotal, hits: incrementHits } };
+
+  if (collectionId === 'standardDeckAttempts' && data.guessType) {
+    const guessType = data.guessType;
+    globalUpdate[collectionId].subStats = { [guessType]: { total: incrementTotal, hits: incrementHits } };
+    userUpdate[collectionId].subStats = { [guessType]: { total: incrementTotal, hits: incrementHits } };
+  }
+  batch.set(globalStatsRef, globalUpdate, { merge: true });
+  batch.set(userStatsRef, userUpdate, { merge: true });
+  await batch.commit(); return null;
+});
+
+export const purgeUserRecords = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  const db = admin.firestore();
+  const adminDoc = await db.collection('admins').doc(context.auth.uid).get();
+  if (!adminDoc.exists) throw new functions.https.HttpsError('permission-denied', 'Must be admin');
+
+  const { targetUserId, moduleName } = data;
+  if (!targetUserId || !moduleName) throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
+  
+  let collectionsToPurge: string[] = [];
+  if (moduleName === 'All') {
+    collectionsToPurge = ['zenerAttempts', 'colorAttempts', 'astroTarotAttempts', 'standardDeckAttempts', 'stockAttempts'];
+  } else {
+    collectionsToPurge = [moduleName];
+  }
+  
+  let deletedCount = 0;
+  const userUpdate: any = {};
+  const globalUpdate: any = {};
+
+  for (const collectionName of collectionsToPurge) {
+    let colTotal = 0; let colHits = 0; let colSubStats: any = {};
+    
+    let hasMore = true;
+    while (hasMore) {
+      const snapshot = await db.collection(collectionName).where('userId', '==', targetUserId).limit(500).get();
+      if (snapshot.empty) { hasMore = false; break; }
+      const batch = db.batch(); 
+      snapshot.docs.forEach(doc => { 
+        const d = doc.data();
+        colTotal++;
+        if (d.isSuccess) colHits++;
+        if (collectionName === 'standardDeckAttempts' && d.guessType) {
+          if (!colSubStats[d.guessType]) colSubStats[d.guessType] = { total: 0, hits: 0 };
+          colSubStats[d.guessType].total++;
+          if (d.isSuccess) colSubStats[d.guessType].hits++;
+        }
+        batch.delete(doc.ref); 
+        deletedCount++; 
+      }); 
+      await batch.commit();
+    }
+
+    // Force a zero-out in the User's Personal Stats
+    userUpdate[collectionName] = { total: 0, hits: 0 };
+    if (collectionName === 'standardDeckAttempts') userUpdate[collectionName].subStats = {};
+
+    // Accurately decrement the Global Aggregation
+    if (colTotal > 0) {
+      globalUpdate[`${collectionName}.total`] = admin.firestore.FieldValue.increment(-colTotal);
+      globalUpdate[`${collectionName}.hits`] = admin.firestore.FieldValue.increment(-colHits);
+      
+      if (collectionName === 'standardDeckAttempts') {
+        for (const guessType of Object.keys(colSubStats)) {
+           globalUpdate[`${collectionName}.subStats.${guessType}.total`] = admin.firestore.FieldValue.increment(-colSubStats[guessType].total);
+           globalUpdate[`${collectionName}.subStats.${guessType}.hits`] = admin.firestore.FieldValue.increment(-colSubStats[guessType].hits);
+        }
+      }
+    }
   }
 
-  if (isAdmin === false) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center">
-        <ShieldAlert className="w-16 h-16 text-white mb-6" />
-        <h1 className="text-3xl font-bold tracking-tight mb-4">Unauthorized</h1>
-        <p className="text-neutral-400 max-w-md">You do not have permission to view this page.</p>
-      </div>
-    );
+  if (Object.keys(userUpdate).length > 0) {
+    await db.collection('userStats').doc(targetUserId).set(userUpdate, { merge: true });
+  }
+  if (Object.keys(globalUpdate).length > 0) {
+    await db.collection('globalStats').doc('aggregate').update(globalUpdate).catch(() => {});
   }
 
-  return (
-    <div className="max-w-5xl mx-auto pb-12">
-      <header className="mb-12">
-        <h1 className="text-4xl font-bold tracking-tight text-white mb-2">System Administration</h1>
-        <p className="text-neutral-400 text-lg">Manage global state, user records, and database integrity.</p>
-      </header>
+  return { success: true, deletedCount };
+});
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Global Quick Actions */}
-        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Zap className="w-6 h-6 text-white" />
-            <h2 className="text-2xl font-bold text-white">Quick Actions</h2>
-          </div>
-          
-          <div className="space-y-6">
-            <div className="flex items-center justify-between p-4 rounded-xl border border-neutral-800 bg-neutral-950">
-              <div>
-                <p className="text-white font-medium">Infinite Focus (Self)</p>
-                <p className="text-neutral-500 text-sm">Bypass all stamina restrictions.</p>
-              </div>
-              <button
-                onClick={handleToggleInfiniteFocus}
-                disabled={isToggling}
-                className={`relative inline-flex h-7 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/75 ${localIsInfinite ? 'bg-white' : 'bg-neutral-700'}`}
-              >
-                <span className={`pointer-events-none inline-block h-6 w-6 transform rounded-full shadow-lg ring-0 transition duration-200 ease-in-out ${localIsInfinite ? 'translate-x-7 bg-black' : 'translate-x-0 bg-white'}`} />
-              </button>
-            </div>
+export const adminManageStamina = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  const db = admin.firestore();
+  const adminDoc = await db.collection('admins').doc(context.auth.uid).get();
+  if (!adminDoc.exists) throw new functions.https.HttpsError('permission-denied', 'Must be admin');
 
-            <button
-              onClick={handleRecalculateStats}
-              disabled={isRecalculating}
-              className="w-full py-4 px-4 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-neutral-800 text-white hover:bg-neutral-700 border border-neutral-700"
-            >
-              {isRecalculating ? <Loader2 className="w-5 h-5 animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-              Recalculate Personal Stats
-            </button>
-          </div>
+  const { targetUserId, action } = data;
+  if (!targetUserId || !action) throw new functions.https.HttpsError('invalid-argument', 'Missing parameters');
+  const userStatsRef = db.collection('userStats').doc(targetUserId);
+  
+  if (action === 'refill') {
+    await userStatsRef.set({ focusStamina: 3, nextRefill: null }, { merge: true });
+  } else if (action === 'deplete') {
+    await userStatsRef.set({ focusStamina: 0, nextRefill: Date.now() + 3600000 }, { merge: true });
+  } else if (action === 'toggleInfinite') {
+    const docSnap = await userStatsRef.get();
+    const isInfinite = docSnap.data()?.isInfinite || false;
+    await userStatsRef.set({ isInfinite: !isInfinite }, { merge: true });
+  } else { throw new functions.https.HttpsError('invalid-argument', 'Invalid action'); }
+  return { success: true };
+});
 
-          {statusMessage && (
-            <div className={`mt-6 p-4 rounded-xl border ${statusMessage.type === 'success' ? 'bg-green-900/20 border-green-900/50 text-green-400' : 'bg-red-900/20 border-red-900/50 text-red-400'}`}>
-              {statusMessage.text}
-            </div>
-          )}
-        </div>
+export const getStaminaStatus = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  if (data && data.ping) return { status: 'pong' };
+  const db = admin.firestore();
+  const userStatsDoc = await db.collection('userStats').doc(context.auth.uid).get();
+  if (!userStatsDoc.exists) return { currentStamina: 3, remainingMs: 0, isInfinite: false };
 
-        {/* Focus Management Module */}
-        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8">
-          <div className="flex items-center gap-3 mb-6">
-            <BatteryMedium className="w-6 h-6 text-white" />
-            <h2 className="text-2xl font-bold text-white">Focus Management</h2>
-          </div>
-          <p className="text-neutral-400 text-sm mb-6">Select a user to manually adjust their stamina points.</p>
-          
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Target User</label>
-              <div className="relative">
-                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
-                <select
-                  value={targetUserId}
-                  onChange={(e) => setTargetUserId(e.target.value)}
-                  className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
-                >
-                  <option value="" disabled>Select a user...</option>
-                  {userList.map(u => (
-                    <option key={u.uid} value={u.uid}>
-                      {u.email} {u.uid === user?.uid ? '(You)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <p className="text-xs text-neutral-600 mt-2 font-mono">UID: {targetUserId || 'None selected'}</p>
-            </div>
-            
-            <div className="flex flex-wrap gap-4">
-              <button
-                onClick={() => handleFocusAction('refill')}
-                disabled={isManagingFocus || !targetUserId}
-                className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-white hover:bg-neutral-200 text-black font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isManagingFocus ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Refill (Max)'}
-              </button>
-              <button
-                onClick={() => handleFocusAction('deplete')}
-                disabled={isManagingFocus || !targetUserId}
-                className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-neutral-800 hover:bg-neutral-700 text-white font-semibold rounded-xl transition-colors border border-neutral-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Deplete (Zero)
-              </button>
-              <button
-                onClick={() => handleFocusAction('toggleInfinite')}
-                disabled={isManagingFocus || !targetUserId}
-                className="flex-1 min-w-[120px] py-3 px-4 flex items-center justify-center bg-purple-900/20 hover:bg-purple-900/40 text-purple-400 font-semibold rounded-xl transition-colors border border-purple-900/50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Toggle Infinite
-              </button>
-            </div>
-          </div>
+  const stats = userStatsDoc.data();
+  const now = Date.now();
+  let currentStamina = stats?.focusStamina ?? 3;
+  let nextRefill = stats?.nextRefill ?? null;
+  const isInfinite = stats?.isInfinite ?? false;
 
-          {focusStatusMessage && (
-            <div className={`mt-6 p-4 rounded-xl border ${focusStatusMessage.type === 'success' ? 'bg-green-900/20 border-green-900/50 text-green-400' : 'bg-red-900/20 border-red-900/50 text-red-400'}`}>
-              {focusStatusMessage.text}
-            </div>
-          )}
-        </div>
+  if (!isInfinite && currentStamina === 0 && nextRefill !== null && now >= nextRefill) {
+    currentStamina = 3; nextRefill = null;
+  }
+  const remainingMs = nextRefill ? Math.max(0, nextRefill - now) : 0;
+  return { currentStamina, remainingMs, isInfinite };
+});
 
-        {/* Database Scrubber */}
-        <div className="bg-neutral-900/50 border border-neutral-800 rounded-3xl p-8 md:col-span-2">
-          <div className="flex items-center gap-3 mb-6">
-            <Database className="w-6 h-6 text-white" />
-            <h2 className="text-2xl font-bold text-white">Database Scrubber</h2>
-          </div>
-          <p className="text-neutral-400 text-sm mb-8">Hard-delete user telemetry and history. This cannot be undone.</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-            <div className="md:col-span-6">
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Target User</label>
-              <div className="relative">
-                <Users className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-500 pointer-events-none" />
-                <select
-                    value={targetUserId}
-                    onChange={(e) => setTargetUserId(e.target.value)}
-                    className="w-full bg-neutral-950 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
-                  >
-                    <option value="" disabled>Select a user...</option>
-                    {userList.map(u => (
-                      <option key={u.uid} value={u.uid}>{u.email}</option>
-                    ))}
-                </select>
-              </div>
-            </div>
-            
-            <div className="md:col-span-4">
-              <label className="block text-sm font-medium text-neutral-300 mb-2">Target Collection</label>
-              <select 
-                value={moduleName}
-                onChange={(e) => setModuleName(e.target.value)}
-                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-white/20 transition-all appearance-none"
-              >
-                <option value="All">All Attempts</option>
-                <option value="zenerAttempts">Zener Cards</option>
-                <option value="colorAttempts">Color Target</option>
-                <option value="standardDeckAttempts">Standard Deck</option>
-                <option value="astroTarotAttempts">Astro-Tarot</option>
-                <option value="stockAttempts">Stock Strategy</option>
-              </select>
-            </div>
+export const recalculatePersonalStats = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  const uid = context.auth.uid;
+  const db = admin.firestore();
+  const collections = ['zenerAttempts', 'colorAttempts', 'astroTarotAttempts', 'standardDeckAttempts', 'stockAttempts'];
+  const userUpdate: any = {};
 
-            <div className="md:col-span-2">
-              <button
-                onClick={() => setShowConfirm(true)}
-                disabled={isPurging || !targetUserId}
-                className="w-full py-3 px-4 flex items-center justify-center bg-red-900/20 hover:bg-red-900/40 text-red-500 border border-red-900/50 font-semibold rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Purge Data
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+  for (const col of collections) {
+    const snapshot = await db.collection(col).where('userId', '==', uid).get();
+    let total = 0; let hits = 0; let subStats: any = {};
 
-      {/* Confirmation Modal */}
-      {showConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
-          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-md w-full shadow-2xl">
-            <div className="flex items-center gap-3 text-red-500 mb-4">
-              <AlertTriangle className="w-8 h-8" />
-              <h3 className="text-xl font-bold">Confirm Purge</h3>
-            </div>
-            <p className="text-neutral-300 mb-6">
-              Are you absolutely sure you want to purge <strong>{moduleName}</strong> records for this user? This action cannot be undone.
-            </p>
-            <div className="flex gap-4 justify-end">
-              <button 
-                onClick={() => setShowConfirm(false)}
-                className="px-4 py-2 rounded-lg font-medium text-neutral-400 hover:text-white hover:bg-neutral-800 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                onClick={executePurge}
-                className="px-4 py-2 rounded-lg font-bold bg-red-600 hover:bg-red-700 text-white transition-colors flex items-center gap-2"
-              >
-                {isPurging ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                Execute Purge
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+    snapshot.docs.forEach(doc => {
+      total++; const d = doc.data(); if (d.isSuccess) hits++;
+      if (col === 'standardDeckAttempts' && d.guessType) {
+        if (!subStats[d.guessType]) subStats[d.guessType] = { total: 0, hits: 0 };
+        subStats[d.guessType].total++; if (d.isSuccess) subStats[d.guessType].hits++;
+      }
+    });
+
+    userUpdate[col] = { total, hits };
+    if (col === 'standardDeckAttempts') userUpdate[col].subStats = subStats;
+  }
+
+  await db.collection('userStats').doc(uid).set(userUpdate, { merge: true });
+  return { success: true, processed: Object.keys(userUpdate).length };
+});
+
+export const adminGetUsers = functions.https.onCall(async (data: any, context: any) => {
+  if (!context.auth) throw new functions.https.HttpsError('unauthenticated', 'Must be logged in');
+  const db = admin.firestore();
+  const adminDoc = await db.collection('admins').doc(context.auth.uid).get();
+  if (!adminDoc.exists) throw new functions.https.HttpsError('permission-denied', 'Must be admin');
+
+  try {
+    const userRecords = await admin.auth().listUsers(1000);
+    return userRecords.users.map(u => ({
+      uid: u.uid,
+      email: u.email || 'No Email',
+      displayName: u.displayName || 'Unknown'
+    }));
+  } catch (error) {
+    throw new functions.https.HttpsError('internal', 'Failed to fetch users');
+  }
+});
