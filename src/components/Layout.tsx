@@ -234,6 +234,9 @@ export const Layout: React.FC = () => {
           </div>
         )}
       </main>
+      <footer className="text-center text-xs text-neutral-600 p-4 border-t border-neutral-900">
+        <a href="/privacy" className="hover:text-neutral-400 transition-colors">Privacy Policy</a>
+      </footer>
     </div>
   );
 };

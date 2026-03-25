@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../components/AuthContext';
+import { useOutletContext } from 'react-router-dom';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, functions } from '../firebase';
@@ -7,6 +8,7 @@ import { ShieldAlert, Database, AlertTriangle, Loader2, BatteryMedium, TrendingU
 
 export const Admin: React.FC = () => {
   const { user } = useAuth();
+  const { isInfinite } = useOutletContext<{ isInfinite: boolean }>();
   const [isAdmin, setIsAdmin] = useState<boolean | null>(null);
 
   // Scrubber State
@@ -148,19 +150,42 @@ export const Admin: React.FC = () => {
 
             <div className="mt-6 pt-6 border-t border-neutral-800">
               <h3 className="text-lg font-medium text-white mb-4">Quick Actions</h3>
-              <button
-                onClick={() => {
-                  if (!user) return;
-                  setTargetUserId(user.uid);
-                  setModuleName('Stock');
-                  setShowConfirm(true);
-                }}
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <TrendingUp className="w-5 h-5" />}
-                Clear My Stock Attempts
-              </button>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    if (!user) return;
+                    setTargetUserId(user.uid);
+                    setModuleName('Stock');
+                    setShowConfirm(true);
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <TrendingUp className="w-5 h-5" />}
+                  Clear My Stock Attempts
+                </button>
+                <button
+                  onClick={async () => {
+                    setIsSubmitting(true);
+                    setStatusMessage(null);
+                    try {
+                      const recalculatePersonalStats = httpsCallable(functions, 'recalculatePersonalStats');
+                      await recalculatePersonalStats();
+                      setStatusMessage({ type: 'success', text: 'Successfully recalculated personal stats.' });
+                    } catch (error: any) {
+                      console.error("Error recalculating stats:", error);
+                      setStatusMessage({ type: 'error', text: error.message || 'An error occurred while recalculating stats.' });
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="w-full flex items-center justify-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-4 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Database className="w-5 h-5" />}
+                  Recalculate Personal Stats
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -205,12 +230,17 @@ export const Admin: React.FC = () => {
                   setFocusStatusMessage({ type: 'error', text: 'Error: ' + error.message });
                 }
               }}
-              className="flex-1 flex items-center justify-between bg-neutral-800 hover:bg-neutral-700 text-white font-bold py-3 px-6 rounded-lg transition-colors border border-neutral-700"
+              className={`flex-1 flex items-center justify-between font-bold py-3 px-6 rounded-lg transition-colors border ${
+                isInfinite 
+                  ? 'bg-indigo-900/40 hover:bg-indigo-900/60 text-indigo-300 border-indigo-500/50' 
+                  : 'bg-neutral-800 hover:bg-neutral-700 text-white border-neutral-700'
+              }`}
             >
               <span>Infinite Focus (Self)</span>
-              <div className="flex items-center gap-2 text-sm font-normal text-neutral-400">
-                <span>Toggle Mode</span>
-                <ToggleRight className="w-5 h-5 text-indigo-400" />
+              <div className={`flex items-center gap-2 text-sm font-bold px-3 py-1 rounded-full ${
+                isInfinite ? 'bg-indigo-500/20 text-indigo-300' : 'bg-neutral-900 text-neutral-400'
+              }`}>
+                {isInfinite ? 'ACTIVE' : 'INACTIVE'}
               </div>
             </button>
           </div>

@@ -1,0 +1,42 @@
+import React from 'react';
+
+export const PrivacyPolicy: React.FC = () => {
+  return (
+    <div className="max-w-3xl mx-auto p-8 text-neutral-300">
+      <h1 className="text-3xl font-bold text-white mb-8">Privacy Policy</h1>
+      
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Information Collection</h2>
+        <p className="mb-4">
+          When you log in to our application, we collect your Google Auth UID and Email address. 
+          This information is used solely to authenticate you and associate your activity with your account.
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Data Usage</h2>
+        <p className="mb-4">
+          We store the results of your ARV (Associative Remote Viewing) attempts, including your guesses, 
+          the actual targets, and the timestamp of each attempt. This data is used to calculate your 
+          personal statistics and track your progress over time.
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Third-Party Services</h2>
+        <p className="mb-4">
+          We use Firebase (a Google service) for authentication, database storage, and backend functions. 
+          Your data is stored securely on Firebase's servers. Please refer to Google's Privacy Policy for 
+          more information on how they handle data.
+        </p>
+      </section>
+
+      <section className="mb-8">
+        <h2 className="text-xl font-semibold text-white mb-4">Contact</h2>
+        <p className="mb-4">
+          If you have any questions or concerns about our privacy practices, please contact the administrator.
+        </p>
+      </section>
+    </div>
+  );
+};
